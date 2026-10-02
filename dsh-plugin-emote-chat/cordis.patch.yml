@@ -1,0 +1,25 @@
+# The dsh-plugin-emote-chat bundle patch: two rows, one per half.
+#
+# 1. `emote-chat` — the UI/host half: the exact /api routes, the sticker
+#    catalog, the prompt guidance, and (through `dsh.client`) the browser
+#    surface: the Settings page, the composer picker, sticker painting, the
+#    reaction chips, and the emoji rain.
+# 2. `emote-chat-tool` — the model-facing half, a separate package so the Loader
+#    can activate it exactly where the tool registry lives (`inject: ['tools']`,
+#    the same contract every shipped tool plugin uses, e.g. dsh-tool-cordis).
+#    A context that merely inherits that service cannot register into it.
+#
+# `config` holds every live field the Settings page edits. The `settings.section`
+# page registered by the browser half writes through `ctx.remote.settings` (and
+# falls back to this profile's own patch), so edits persist across restarts.
+- insert:
+    - id: emote-chat
+      name: dsh-plugin-emote-chat
+      config:
+        stickerReply: false
+        paths: []
+        emojiReply: false
+        emojiRain: false
+        emojiList: []
+    - id: emote-chat-tool
+      name: dsh-plugin-emote-chat-tool

@@ -1,0 +1,23 @@
+# Normalise line endings in the repository to LF.
+#
+# Without this, Git applies `core.autocrlf` on Windows and rewrites every text file
+# to CRLF in the working tree, so a diff can show a whole file as changed when only
+# one line moved. The plugin ships shell-runnable scripts and a YAML patch document,
+# and both are read by tools that do not want CRLF, so the repository stores LF and
+# the checkout keeps LF.
+* text=auto eol=lf
+
+# Binary files: never touch their line endings or try to diff them as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.bmp binary
+*.ico binary
+*.svg text eol=lf
+
+# Windows-only scripts, where CRLF is the convention the interpreter expects.
+*.bat text eol=crlf
+*.cmd text eol=crlf
