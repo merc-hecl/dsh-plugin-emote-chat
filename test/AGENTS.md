@@ -8,5 +8,6 @@ reaction-painter.test.mjs: 回应 DOM 回归；覆盖身份、清空、跨 epoch
 dom-fixture.mjs: 测试专用 ModuleLoader/React/DOM 夹具；不执行真实宿主操作
 feed.test.mjs: 受控网络和计时器回归；覆盖快照、退避、重启与取消
 regression.test.mjs: Host 组装契约及存储回归；独立临时目录隔离真实配置
+discovery.test.mjs: 模型素材发现契约；覆盖两级查询、分页边界、刷新、开关及可见输出
 
 [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md

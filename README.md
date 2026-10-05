@@ -16,7 +16,8 @@ Stickers and emoji reactions for the DeepSeek Harness chat — Web and Desktop.
   sticker you pick into the message you are writing. Nothing is sent for you.
 - **Stickers you send appear as images**, with the image on your side of the conversation and the
   message text below it.
-- **The Agent sends stickers too.** When it answers with one, the image appears just the same.
+- **The Agent sends stickers too.** It can browse your available packs and stickers when needed,
+  then choose one to include in its reply. The image appears just the same.
 - **Your transcript keeps the short tag** `[[sticker:pack/name]]` instead of any image data, so a
   plain-text export stays readable and no image ever goes to the model.
 - **PNG, JPEG, GIF (animated), WebP, AVIF, BMP, SVG.**

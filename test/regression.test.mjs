@@ -140,7 +140,8 @@ async function mount(t, initial = {}, options = {}) {
 
 test("one package registers tool, routes, and truthful synchronous guidance", async (t) => {
   const app = await mount(t);
-  assert.equal(app.tools.size, 1);
+  assert.equal(app.tools.size, 2);
+  assert.equal(app.tools.get("list_stickers").parameters.type, "object");
   assert.equal(app.service.toolRegistered(), true);
   const definition = app.tools.get("emote_reply");
   assert.equal(definition.parameters.type, "object");
@@ -306,13 +307,19 @@ test("unknown sticker fails and known sticker returns the transcript token", asy
   await mkdir(dir);
   await writeFile(join(dir, "ok.png"), "png");
   app.values.paths = [dir];
+  const list = app.tools.get("list_stickers");
+  const packs = await list.execute({});
+  assert.deepEqual(packs.packs, [{ id: "cats", count: 1 }]);
+  const discovered = await list.execute({ pack: packs.packs[0].id });
+  assert.deepEqual(discovered.stickers, [{ id: "cats/ok", name: "ok" }]);
+  assert.doesNotMatch(app.sections[0].text(), /cats\/ok|cats:/);
   const tool = app.tools.get("emote_reply");
   await assert.rejects(
     tool.execute({ sticker: "cats/missing" }, {}),
     /unknown sticker/,
   );
   assert.match(
-    (await tool.execute({ sticker: "cats/ok" }, {})).message,
+    (await tool.execute({ sticker: discovered.stickers[0].id }, {})).message,
     /\[\[sticker:cats\/ok\]\]/,
   );
 });
