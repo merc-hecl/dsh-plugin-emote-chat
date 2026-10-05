@@ -40,7 +40,7 @@ Every label follows the harness UI language (`Settings → General → Language`
 
 ### Desktop
 
-Install the local `dsh-plugin-emote-chat` directory through Desktop plugin management.
+Install the local plugin directory containing `package.json` through Desktop plugin management.
 Desktop 0.2.0-rc.2 manages its own profile.
 
 ### Web
@@ -48,7 +48,7 @@ Desktop 0.2.0-rc.2 manages its own profile.
 You need the dsh CLI and pnpm (`npm install -g pnpm`). Install from a local directory:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add link:/absolute/path/to/dsh-plugin-emote-chat -w
+npx @deepseek-ai/dsh plugin --profile web add link:/absolute/path/to/dsh-plugin-stickers -w
 ```
 
 Restart dsh and refresh the page after installation.

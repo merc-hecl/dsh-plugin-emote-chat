@@ -37,7 +37,7 @@ description: "DeepSeek Harness 聊天的贴纸与 emoji 回应：输入框贴纸
 
 ### Desktop
 
-在 Desktop 的插件管理界面安装本地 `dsh-plugin-emote-chat` 目录。
+在 Desktop 的插件管理界面安装包含 `package.json` 的本地插件目录。
 Desktop 0.2.0-rc.2 的专用 profile 由应用管理。
 
 ### Web
@@ -45,7 +45,7 @@ Desktop 0.2.0-rc.2 的专用 profile 由应用管理。
 需要可用的 dsh CLI 和 pnpm（`npm install -g pnpm`）。从本地目录安装：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add link:/你的绝对路径/dsh-plugin-emote-chat -w
+npx @deepseek-ai/dsh plugin --profile web add link:/你的绝对路径/dsh-plugin-stickers -w
 ```
 
 安装后重启 dsh 并刷新页面。
