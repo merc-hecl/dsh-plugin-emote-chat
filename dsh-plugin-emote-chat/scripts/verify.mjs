@@ -1,8 +1,14 @@
 /**
+ * [INPUT]: Node crypto/fs 与 DSH settings describe/mutate 协议
+ * [OUTPUT]: 配置及素材诊断，显式 --write 时执行 revision 保护的更新
+ * [POS]: 开发集成诊断；默认只读，不通过文本编辑 profile
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
+ */
+/**
  * Verification driver for a running dsh Web/Desktop process.
  *
  * It speaks the same wire protocol the Settings page uses: a credentialed POST
- * of a `client-request` envelope to `/api/remote.mux`, the Connection bridge's
+ * of a `client-request` envelope to `/api/settings/*`, the Connection bridge's
  * unary RPC channel. `settings/describe` reports each plugin's configurable
  * namespaces, and `settings/mutate` performs the write the page performs.
  *

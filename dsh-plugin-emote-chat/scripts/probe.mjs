@@ -1,4 +1,10 @@
 /**
+ * [INPUT]: Node crypto/fs 与本地 DSH 浏览器会话认证
+ * [OUTPUT]: 插件准确 HTTP 路由的只读诊断输出
+ * [POS]: 开发诊断脚本；不进入发布包，不改变宿主配置
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
+ */
+/**
  * Read-only verification probe for a running dsh Web/Desktop process.
  *
  * It signs the browser-session cookie from `$DSH_HOME/.credentials.yaml` (the
@@ -90,7 +96,6 @@ async function probe(path) {
 
 console.log(`probe: ${base} (authority ${authority}, cookie ${cookie === "" ? "unavailable" : "signed"})`);
 await probe("/api/emote-chat/config");
-await probe("/api/emote-chat/emoji");
-await probe("/api/emote-chat/reactions?session=probe&since=0");
+await probe("/api/emote-chat/reactions?since=0");
 await probe("/api/emote-chat/sticker?id=missing%2Fmissing");
 await probe("/api/emote-chat/does-not-exist");

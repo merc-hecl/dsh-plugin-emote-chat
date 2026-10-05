@@ -1,5 +1,10 @@
 """Generate a small sample sticker pack for dsh-plugin-emote-chat.
 
+[INPUT]: Pillow 的 Image/ImageDraw 与可选输出路径
+[OUTPUT]: 静态 PNG、动态 GIF 和明确尺寸的 SVG 样例
+[POS]: 开发用素材生成器；输出位于不发布的 samples 目录
+[PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
+
 The pack doubles as a manual smoke test for the whole pipeline: a static image,
 two animated GIFs (so animation support is visible at a glance), and an SVG with
 an explicit size.

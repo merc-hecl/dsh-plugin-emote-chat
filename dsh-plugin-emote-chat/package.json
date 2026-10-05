@@ -10,8 +10,7 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "lib",
-    "scripts",
+    "lib/*.js",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
@@ -30,7 +29,11 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
-    "test": "node --test test/"
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "prepack": "npm run build",
+    "lint": "eslint lib src",
+    "check": "npm run lint && npm run build && npm test"
   },
   "dsh": {
     "bundle": {
@@ -41,8 +44,7 @@
       "inject": [
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-session",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-api-remotes"
+        "@deepseek-ai/dsh-client-ui-conversation"
       ]
     }
   },
@@ -51,5 +53,9 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": []
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "eslint": "^10.12.0"
   }
 }

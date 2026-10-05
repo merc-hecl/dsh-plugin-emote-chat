@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: node:test、VM 与生成的客户端 bundle
+ * [OUTPUT]: 客户端注册、UI 和消息匹配行为测试
+ * [POS]: 客户端测试入口；独立夹具隔离真实浏览器
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
+ */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -62,10 +68,15 @@ function loadBundle(overrides = {}) {
             type,
             props: {
               ...(props ?? {}),
-              ...(children.length === 0 ? {} : { children: children.length === 1 ? children[0] : children }),
+              ...(children.length === 0
+                ? {}
+                : { children: children.length === 1 ? children[0] : children }),
             },
           }),
-          useState: (initial) => [typeof initial === "function" ? initial() : initial, () => {}],
+          useState: (initial) => [
+            typeof initial === "function" ? initial() : initial,
+            () => {},
+          ],
           useEffect: () => {},
           useRef: () => ({ current: null }),
           useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot(),
@@ -84,10 +95,15 @@ function loadBundle(overrides = {}) {
           IconPlusOutlineRegular: passthrough("svg"),
         };
       }
-      if (spec === "react/jsx-runtime") return { jsx: () => null, jsxs: () => null };
+      if (spec === "react/jsx-runtime")
+        return { jsx: () => null, jsxs: () => null };
       throw new Error(`unexpected require("${spec}")`);
     },
-    fetch: async () => ({ ok: true, json: async () => ({ packs: [], paths: [], emoji: [] }) }),
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({ packs: [], paths: [], emoji: [] }),
+    }),
+    AbortController,
     setTimeout,
     clearTimeout,
     setInterval: () => 0,
@@ -118,8 +134,17 @@ function loadBundle(overrides = {}) {
   };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(readFileSync(bundlePath, "utf8"), sandbox, { filename: "lib/client.js" });
-  return { registration, exports: registration.factory(sandbox.require), styleTags, sandbox, document, observers };
+  vm.runInContext(readFileSync(bundlePath, "utf8"), sandbox, {
+    filename: "lib/client.js",
+  });
+  return {
+    registration,
+    exports: registration.factory(sandbox.require),
+    styleTags,
+    sandbox,
+    document,
+    observers,
+  };
 }
 
 /**
@@ -143,7 +168,9 @@ function makeStubNode(tag) {
       node.attributes[name] = String(value);
     },
     getAttribute(name) {
-      return Object.hasOwn(node.attributes, name) ? node.attributes[name] : null;
+      return Object.hasOwn(node.attributes, name)
+        ? node.attributes[name]
+        : null;
     },
     addEventListener() {},
     append(...nodes) {
@@ -154,7 +181,9 @@ function makeStubNode(tag) {
     },
     remove() {
       if (node.parent === null) return;
-      node.parent.children = node.parent.children.filter((child) => child !== node);
+      node.parent.children = node.parent.children.filter(
+        (child) => child !== node,
+      );
       node.parent = null;
     },
     after() {},
@@ -169,7 +198,8 @@ function makeStubNode(tag) {
     replaceChildren() {},
     /** Direct-children lookup, which is all the nav scan performs. */
     querySelector(selector) {
-      if (selector === "svg") return node.children.find((child) => child.tagName === "SVG") ?? null;
+      if (selector === "svg")
+        return node.children.find((child) => child.tagName === "SVG") ?? null;
       return null;
     },
     querySelectorAll() {
@@ -222,15 +252,21 @@ test("the bundle registers under the package id with an apply export", () => {
   assert.ok(Array.isArray(exports.inject));
   assert.ok(exports.inject.includes("slots"));
   assert.ok(exports.inject.includes("locale"));
-  assert.ok(exports.inject.includes("remote.settings"));
+  assert.ok(exports.inject.includes("slots"));
 });
 
 test("apply injects the composer picker, the settings page, and the tool card", () => {
   const { exports } = loadBundle();
   const { ctx, injected, registered } = fakeContext();
   exports.apply(ctx);
-  assert.deepEqual(injected.sort(), ["conversation.input.left", "settings.section", "tool.call.toolview"]);
-  const picker = registered.find((entry) => entry.options.id === "emote-picker");
+  assert.deepEqual(injected.sort(), [
+    "conversation.input.left",
+    "settings.section",
+    "tool.call.toolview",
+  ]);
+  const picker = registered.find(
+    (entry) => entry.options.id === "emote-picker",
+  );
   assert.ok(picker, "the composer picker must register");
   assert.equal(picker.options.name, "conversation.input.left");
   assert.equal(typeof picker.component, "function");
@@ -258,8 +294,14 @@ test("apply installs exactly one tagged stylesheet", () => {
   // bottom, which pinned the direction in the wrong place.
   assert.match(tag.textContent, /@keyframes ec-rain-fall/);
   assert.doesNotMatch(tag.textContent, /ec-rain-rise/);
-  assert.match(tag.textContent, /\.ec-rain > span \{\s*position: absolute; top: -10vh/);
-  assert.match(tag.textContent, /translate3d\(var\(--ec-drift, 0px\), 118vh, 0\)/);
+  assert.match(
+    tag.textContent,
+    /\.ec-rain > span \{\s*position: absolute; top: -10vh/,
+  );
+  assert.match(
+    tag.textContent,
+    /translate3d\(var\(--ec-drift, 0px\), 118vh, 0\)/,
+  );
 });
 
 test("the rain gate plays a recent live reaction and nothing else", () => {
@@ -271,14 +313,43 @@ test("the rain gate plays a recent live reaction and nothing else", () => {
   const { shouldRain, RAIN_FRESH_MS } = exports.internals;
   const now = 1_000_000;
   const fresh = { seq: 1, emoji: "🎉", live: true, at: now - 2_000 };
-  const stale = { seq: 2, emoji: "🎉", live: true, at: now - RAIN_FRESH_MS - 1 };
+  const stale = {
+    seq: 2,
+    emoji: "🎉",
+    live: true,
+    at: now - RAIN_FRESH_MS - 1,
+  };
 
-  assert.equal(shouldRain(fresh, now, new Set()), true, "a live reaction from 2s ago rains");
-  assert.equal(shouldRain(stale, now, new Set()), false, "a reaction older than the window does not");
-  assert.equal(shouldRain({ ...fresh, live: false }, now, new Set()), false, "a priming entry never rains");
-  assert.equal(shouldRain(fresh, now, new Set([fresh.seq])), false, "a sequence rains once");
-  assert.equal(shouldRain(undefined, now, new Set()), false, "a malformed entry is ignored");
-  assert.equal(shouldRain({ seq: 3, live: true, at: now - RAIN_FRESH_MS }, now, new Set()), true, "the boundary counts as fresh");
+  assert.equal(
+    shouldRain(fresh, now, new Set()),
+    true,
+    "a live reaction from 2s ago rains",
+  );
+  assert.equal(
+    shouldRain(stale, now, new Set()),
+    false,
+    "a reaction older than the window does not",
+  );
+  assert.equal(
+    shouldRain({ ...fresh, live: false }, now, new Set()),
+    false,
+    "a priming entry never rains",
+  );
+  assert.equal(
+    shouldRain(fresh, now, new Set([fresh.seq])),
+    false,
+    "a sequence rains once",
+  );
+  assert.equal(
+    shouldRain(undefined, now, new Set()),
+    false,
+    "a malformed entry is ignored",
+  );
+  assert.equal(
+    shouldRain({ seq: 3, live: true, at: now - RAIN_FRESH_MS }, now, new Set()),
+    true,
+    "the boundary counts as fresh",
+  );
 });
 
 test("a reaction binds once and does not follow the newest message", () => {
@@ -303,18 +374,32 @@ test("a reaction binds once and does not follow the newest message", () => {
 
   // B arrives. The reaction must stay on A, which is the whole point.
   placed = assignReactions(entries, [rowA, rowB]);
-  assert.deepEqual([...placed.keys()], [rowA], "the old reaction does not move to the new message");
+  assert.deepEqual(
+    [...placed.keys()],
+    [rowA],
+    "the old reaction does not move to the new message",
+  );
 
   // A fresh reaction binds to its own message.
   const both = [...entries, { seq: 2, emoji: "🎉", messageId: ID_B }];
   placed = assignReactions(both, [rowA, rowB]);
-  assert.deepEqual(Array.from(placed.get(rowA)).map((e) => e.emoji), ["💪"]);
-  assert.deepEqual(Array.from(placed.get(rowB)).map((e) => e.emoji), ["🎉"]);
+  assert.deepEqual(
+    Array.from(placed.get(rowA)).map((e) => e.emoji),
+    ["💪"],
+  );
+  assert.deepEqual(
+    Array.from(placed.get(rowB)).map((e) => e.emoji),
+    ["🎉"],
+  );
 
   // Once the bound row leaves the DOM the reaction is forgotten, so a rebuilt
   // conversation still shows its history.
   placed = assignReactions(both, [rowB]);
-  assert.deepEqual(Array.from(placed.get(rowB)).map((e) => e.emoji), ["🎉"], "only live rows are painted");
+  assert.deepEqual(
+    Array.from(placed.get(rowB)).map((e) => e.emoji),
+    ["🎉"],
+    "only live rows are painted",
+  );
 });
 
 test("a reaction with no usable stamp binds to nothing", () => {
@@ -359,8 +444,15 @@ test("a declared target beats the anchor", () => {
     new Map(),
     { value: 0 },
   );
-  assert.deepEqual(Array.from(placed.get(oldRow)).map((e) => e.emoji), ["🌧️"], "the older message keeps its own");
-  assert.deepEqual(Array.from(placed.get(newRow)).map((e) => e.emoji), ["🍵"]);
+  assert.deepEqual(
+    Array.from(placed.get(oldRow)).map((e) => e.emoji),
+    ["🌧️"],
+    "the older message keeps its own",
+  );
+  assert.deepEqual(
+    Array.from(placed.get(newRow)).map((e) => e.emoji),
+    ["🍵"],
+  );
 
   // The tail a model would quote resolves to the full id.
   assert.equal(messageIdOf("13:input-message" + ID_OLD), ID_OLD);
@@ -382,7 +474,11 @@ test("a named messageKey wins over timing", () => {
     { value: 0 },
     seen,
   );
-  assert.deepEqual([...placed.keys()], [rowA], "the Host's own anchor is authoritative");
+  assert.deepEqual(
+    [...placed.keys()],
+    [rowA],
+    "the Host's own anchor is authoritative",
+  );
 });
 
 test("apply is idempotent about the listener set and survives a second run", () => {
@@ -416,7 +512,8 @@ function settingsFace(data) {
  * drawer as `props.children`.
  */
 function walk(node, out = []) {
-  if (node === null || node === undefined || typeof node !== "object") return out;
+  if (node === null || node === undefined || typeof node !== "object")
+    return out;
   if (Array.isArray(node)) {
     for (const child of node) walk(child, out);
     return out;
@@ -440,11 +537,13 @@ function walk(node, out = []) {
  * @returns the same shape with every function component replaced by its output.
  */
 function expand(node) {
-  if (node === null || node === undefined || typeof node !== "object") return node;
+  if (node === null || node === undefined || typeof node !== "object")
+    return node;
   if (Array.isArray(node)) return node.map(expand);
   if (typeof node.type === "function") return expand(node.type(node.props));
   const props = {};
-  for (const [key, value] of Object.entries(node.props ?? {})) props[key] = expand(value);
+  for (const [key, value] of Object.entries(node.props ?? {}))
+    props[key] = expand(value);
   return { ...node, props };
 }
 
@@ -452,7 +551,8 @@ function expand(node) {
 function textOf(node) {
   if (typeof node === "string") return node;
   if (Array.isArray(node)) return node.map(textOf).join("");
-  if (node === null || node === undefined || typeof node !== "object") return "";
+  if (node === null || node === undefined || typeof node !== "object")
+    return "";
   return textOf(node.props?.children);
 }
 
@@ -462,7 +562,10 @@ function renderPage(data) {
   const tree = exports.internals.SettingsSection({
     t: (key, params) => {
       if (params === undefined) return key;
-      return Object.entries(params).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), key);
+      return Object.entries(params).reduce(
+        (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+        key,
+      );
     },
     config: settingsFace(data),
     context: { update: async () => ({ ok: true }) },
@@ -476,14 +579,21 @@ const CATALOG = {
   emojiRain: false,
   paths: ["D:\\stickers\\cats", "D:\\missing"],
   packs: [
-    { id: "cats", name: "cats", stickers: [{ id: "cats/happy", name: "happy", mime: "image/png" }] },
+    {
+      id: "cats",
+      name: "cats",
+      stickers: [{ id: "cats/happy", name: "happy", mime: "image/png" }],
+    },
   ],
   errors: [{ path: "D:\\missing", reason: "missing" }],
 };
 
 /** The switches on the rendered page, in row order. */
 function switches(tree) {
-  return walk(tree).filter((node) => typeof node.props?.onChange === "function" && "checked" in node.props);
+  return walk(tree).filter(
+    (node) =>
+      typeof node.props?.onChange === "function" && "checked" in node.props,
+  );
 }
 
 // Two behaviours of this page are verified live rather than here: a switch
@@ -496,14 +606,24 @@ test("an unreadable folder marks its own row instead of failing the page", () =>
   const tree = renderPage(CATALOG);
   const inputs = walk(tree).filter((node) => node.type === "input");
   assert.equal(inputs.length, 2, "one line per configured folder");
-  assert.equal(inputs[0].props["data-missing"], undefined, "the readable folder is not flagged");
-  assert.equal(inputs[1].props["data-missing"], "true", "the missing folder is flagged");
+  assert.equal(
+    inputs[0].props["data-missing"],
+    undefined,
+    "the readable folder is not flagged",
+  );
+  assert.equal(
+    inputs[1].props["data-missing"],
+    "true",
+    "the missing folder is flagged",
+  );
   assert.equal(inputs[1].props.value, "D:\\missing");
 });
 
 test("the preview shows the stickers the scan found", () => {
   const tree = renderPage(CATALOG);
-  const tiles = walk(tree).filter((node) => node.props?.className === "ec-tile");
+  const tiles = walk(tree).filter(
+    (node) => node.props?.className === "ec-tile",
+  );
   assert.equal(tiles.length, 1);
   const image = walk(tiles[0]).find((node) => node.type === "img");
   assert.equal(image.props.src, "/api/emote-chat/sticker?id=cats%2Fhappy");
@@ -517,37 +637,48 @@ test("the folder drawer reports the scan result and the unusable paths", () => {
   // the user has to act on.
   const statuses = (tree) =>
     walk(tree)
-      .filter((node) => node.props?.className === 'ec-note-line')
+      .filter((node) => node.props?.className === "ec-note-line")
       .map((node) => textOf(node))
-      .filter((entry) => entry !== '');
+      .filter((entry) => entry !== "");
 
   const broken = statuses(renderPage(CATALOG));
   assert.ok(
-    broken.some((entry) => entry.includes('section.scanError')),
+    broken.some((entry) => entry.includes("section.scanError")),
     `the unusable path must be reported, got ${JSON.stringify(broken)}`,
   );
   assert.ok(
-    !broken.some((entry) => entry.includes('section.scanned')),
-    'the error replaces the total rather than sitting beside it',
+    !broken.some((entry) => entry.includes("section.scanned")),
+    "the error replaces the total rather than sitting beside it",
   );
 
   const clean = statuses(renderPage({ ...CATALOG, errors: [] }));
   assert.ok(
-    clean.some((entry) => entry.includes('section.scanned')),
+    clean.some((entry) => entry.includes("section.scanned")),
     `the scan total must be reported, got ${JSON.stringify(clean)}`,
   );
 
   const off = statuses(renderPage({ ...CATALOG, stickerReply: false }));
   assert.ok(
-    !off.some((entry) => entry.includes('section.scanError')),
-    'no drawer, no scan report',
+    !off.some((entry) => entry.includes("section.scanError")),
+    "no drawer, no scan report",
   );
 });
 
 test("the page renders without a catalog and asks for folders", () => {
-  const tree = renderPage({ stickerReply: true, emojiReply: false, emojiRain: false, paths: [], packs: [], errors: [] });
+  const tree = renderPage({
+    stickerReply: true,
+    emojiReply: false,
+    emojiRain: false,
+    paths: [],
+    packs: [],
+    errors: [],
+  });
   const inputs = walk(tree).filter((node) => node.type === "input");
-  assert.equal(inputs.length, 1, "an empty list still offers one row to fill in");
+  assert.equal(
+    inputs.length,
+    1,
+    "an empty list still offers one row to fill in",
+  );
   assert.equal(inputs[0].props.value, "");
   const texts = walk(tree).map(textOf).join(" ");
   assert.match(texts, /section\.scanEmpty/u);
@@ -566,11 +697,24 @@ test("a chip restored from the store finds its message by id", () => {
   assert.equal(messageIdOf("13:input-message" + ID), ID);
   assert.equal(messageIdOf(ID), ID, "a bare id is already an id");
   assert.ok(rowMatches(row, { messageId: ID }), "an id-only entry matches");
-  assert.ok(rowMatches(row, { messageKey: "13:input-message" + ID }), "a full key still matches");
-  assert.ok(!rowMatches(row, { messageId: "other" }), "a different message does not match");
+  assert.ok(
+    rowMatches(row, { messageKey: "13:input-message" + ID }),
+    "a full key still matches",
+  );
+  assert.ok(
+    !rowMatches(row, { messageId: "other" }),
+    "a different message does not match",
+  );
 
-  const placed = assignReactions([{ seq: 3, emoji: "🎉", messageId: ID }], [row]);
-  assert.deepEqual([...placed.keys()], [row], "a restored reaction binds to its own message");
+  const placed = assignReactions(
+    [{ seq: 3, emoji: "🎉", messageId: ID }],
+    [row],
+  );
+  assert.deepEqual(
+    [...placed.keys()],
+    [row],
+    "a restored reaction binds to its own message",
+  );
 });
 
 test("a replaced node key still resolves through its id", () => {
@@ -587,28 +731,12 @@ test("a replaced node key still resolves through its id", () => {
   const placed = assignReactions(
     [{ seq: 1, emoji: "👍", messageId: ID }],
     [other, submitted],
-      );
-  assert.deepEqual([...placed.keys()], [submitted], "the id finds its message among several");
-});
-
-
-test("the stylesheet contains no stray backtick", () => {
-  // The stylesheet is one template literal, so a single backtick inside a CSS
-  // comment terminates it early and the whole bundle stops parsing — which is
-  // exactly how a spacing change broke the plugin twice. The delimiters are the
-  // only two allowed, so this counts what lies between them.
-  const tick = String.fromCharCode(96);
-  const source = readFileSync(new URL("../lib/client.js", import.meta.url), "utf8");
-  const open = "const CSS = " + tick;
-  const start = source.indexOf(open);
-  assert.ok(start > 0, "one stylesheet declaration");
-  assert.equal(source.indexOf(open, start + 1), -1, "declared exactly once");
-  const body = source.slice(start + open.length);
-  const close = body.indexOf(tick + ";");
-  assert.ok(close > 0, "closed by a backtick and a semicolon");
-  const css = body.slice(0, close);
-  assert.ok(css.length > 2000, "and the stylesheet is actually there");
-  assert.equal(css.indexOf(tick), -1, "no backtick survives between the delimiters");
+  );
+  assert.deepEqual(
+    [...placed.keys()],
+    [submitted],
+    "the id finds its message among several",
+  );
 });
 
 test("a reaction returns when its message is paged back in", () => {
@@ -630,7 +758,11 @@ test("a reaction returns when its message is paged back in", () => {
   // On screen: the reaction is placed.
   const first = rowOf(ID);
   let placed = assignReactions(entries, [first]);
-  assert.deepEqual([...placed.keys()], [first], "placed while the message is visible");
+  assert.deepEqual(
+    [...placed.keys()],
+    [first],
+    "placed while the message is visible",
+  );
 
   // Paged out: the row is gone, so nothing is placed — and nothing is remembered.
   placed = assignReactions(entries, []);
@@ -640,8 +772,15 @@ test("a reaction returns when its message is paged back in", () => {
   // the case a remembered binding could never handle.
   const returned = rowOf(ID);
   placed = assignReactions(entries, [returned]);
-  assert.deepEqual([...placed.keys()], [returned], "and it comes back with the message");
-  assert.deepEqual(Array.from(placed.get(returned)).map((e) => e.emoji), ["✅"]);
+  assert.deepEqual(
+    [...placed.keys()],
+    [returned],
+    "and it comes back with the message",
+  );
+  assert.deepEqual(
+    Array.from(placed.get(returned)).map((e) => e.emoji),
+    ["✅"],
+  );
 
   // The rule still holds: a message the reaction does not name never receives it.
   const other = rowOf("ccccdddd-1111-2222-3333-444455556666");

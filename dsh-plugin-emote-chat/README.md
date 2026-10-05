@@ -26,7 +26,7 @@ Stickers and emoji reactions for the DeepSeek Harness chat — Web and Desktop.
 - **The Agent reacts to your message with one emoji.** The reaction appears as a small chip inside
   your message bubble — Telegram style. It never enters the reply text and never enters the
   conversation history, so it costs no context.
-- **Each reaction stays with the message it answered.** Sending another message does not move it.
+- **Each reaction stays with the human message that started the turn.** Messages added while the Agent is working do not move it.
 - **Reactions survive a restart**, because they are kept in a small local file.
 - **History keeps its reactions.** When you scroll back into a conversation — including into parts
   that had been collapsed — each message brings its reactions back with it.
@@ -38,34 +38,29 @@ Every label follows the harness UI language (`Settings → General → Language`
 
 ## Install
 
-You need:
+### Desktop
 
-- **dsh** — `dsh --version`, or prefix every command with `npx @deepseek-ai/dsh`
-- **pnpm** on your PATH — `npm install -g pnpm`
+Install the local `dsh-plugin-emote-chat` directory through Desktop plugin management.
+Desktop 0.2.0-rc.2 manages its own profile.
 
-The plugin is two packages and both must be installed, into the **same profile**:
+### Web
+
+You need the dsh CLI and pnpm (`npm install -g pnpm`). Install from a local directory:
 
 ```sh
-# from a local checkout
-npx @deepseek-ai/dsh plugin --profile desktop add link:/absolute/path/to/dsh-plugin-emote-chat -w
-npx @deepseek-ai/dsh plugin --profile desktop add link:/absolute/path/to/dsh-plugin-emote-chat-tool -w
-
-# or, once published
-npx @deepseek-ai/dsh plugin --profile desktop add dsh-plugin-emote-chat dsh-plugin-emote-chat-tool -w
+npx @deepseek-ai/dsh plugin --profile web add link:/absolute/path/to/dsh-plugin-emote-chat -w
 ```
 
-Use `--profile web` for the browser profile. Then **restart dsh and refresh the page** — plugin
-bundles do not hot-reload.
+Restart dsh and refresh the page after installation.
 
 <details>
-<summary>Update or remove</summary>
+<summary>Remove the Web plugin</summary>
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile desktop update dsh-plugin-emote-chat dsh-plugin-emote-chat-tool -w
-npx @deepseek-ai/dsh plugin --profile desktop remove dsh-plugin-emote-chat dsh-plugin-emote-chat-tool -w
+npx @deepseek-ai/dsh plugin --profile web remove dsh-plugin-emote-chat -w
 ```
 
-Restart dsh afterwards.
+Restart dsh and refresh the page afterwards.
 
 </details>
 
@@ -128,18 +123,12 @@ once; your messages are never touched.
 | The picker says "No stickers yet" | **Sticker folders** is empty, the folders do not exist, or they hold no supported images. |
 | A folder line is highlighted red | That directory is missing or is a file, not a directory. |
 | The Agent never sends stickers | Sticker folders must be configured and readable before the setting takes effect. |
-| The Agent never reacts with an emoji | **Enable emoji replies** is off, or the companion package did not load — `plugin_manager list_plugins` should show `emote-chat-tool` as active. |
+| The Agent never reacts with an emoji | Check that **Enable emoji replies** is on, then restart dsh to load the plugin. |
 | A sticker shows as raw text | The sticker is not in the catalog, or the page is older than the install. |
 | A sticker is missing from an older message | That part of the conversation is not loaded yet. Scroll to it — the image comes back with the message. |
 | A reaction chip is missing from an older message | Same reason: only the loaded part of a long conversation is on screen. Scroll to the message and its reaction appears. |
 | No emoji rain | **Enable emoji rain** needs **Enable emoji replies** on. A reaction from before you opened the page shows as a chip, not as rain. |
 | Reactions vanished after a restart | Check that `$DSH_HOME/storages/` is writable; without the file, reactions are per-session. |
-
-## Test
-
-```sh
-node --test test/
-```
 
 ## License
 
