@@ -69,4 +69,4 @@ jobs:
         run: npm install -g npm@latest
 
       - name: Publish to npm
-        run: npm publish dist/*.tgz --access public
+        run: npm publish ./dist/*.tgz --access public
