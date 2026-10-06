@@ -1,7 +1,7 @@
 # test/
 > L2 | 父级: ../AGENTS.md
 
-host.test.mjs: 配置归一化、目录扫描和贴纸完整 ID 的单元测试
+host.test.mjs: 跨平台配置路径归一化、目录扫描和贴纸完整 ID 的单元测试；素材路径采用系统原生路径
 client.test.mjs: 生成 bundle 的 VM 测试；覆盖 slots、设置 UI 与回应匹配
 painter.test.mjs: 贴纸 DOM 回归；覆盖原文还原、宿主重渲染和不可用素材
 reaction-painter.test.mjs: 回应 DOM 回归；覆盖身份、清空、跨 epoch 更新与雨释放

@@ -1,13 +1,13 @@
 /**
- * [INPUT]: node:test、临时文件系统与 Host 业务模块
- * [OUTPUT]: 配置和素材扫描边界测试
+ * [INPUT]: node:test、系统原生路径、临时文件系统与 Host 业务模块
+ * [OUTPUT]: 跨平台路径归一化与素材扫描边界测试
  * [POS]: Host 单元测试；不读取真实用户配置
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
@@ -39,25 +39,38 @@ async function scratch(prefix) {
 }
 
 test("toPathList expands, trims, splits and de-duplicates entries", () => {
-  const list = toPathList(["  D:\\a  ", "D:\\b\nD:\\a", "", "   ", "D:\\b"]);
-  assert.deepEqual(list, ["D:\\a", "D:\\b"]);
+  const a = join(tmpdir(), "emote-chat-a");
+  const b = join(tmpdir(), "emote-chat-b");
+  const list = toPathList([
+    `  ${a}  `,
+    `${b}\n${a}`,
+    "",
+    "   ",
+    `"${b}"`,
+    "~",
+    "~/emote-chat-packs",
+  ]);
+  assert.deepEqual(list, [a, b, homedir(), join(homedir(), "emote-chat-packs")]);
 });
 
 test("toPathList accepts a line-separated string", () => {
-  assert.deepEqual(toPathList("D:\\x\r\nD:\\y"), ["D:\\x", "D:\\y"]);
+  const x = join(tmpdir(), "emote-chat-x");
+  const y = join(tmpdir(), "emote-chat-y");
+  assert.deepEqual(toPathList(`${x}\r\n${y}`), [x, y]);
 });
 
 test("readConfig normalizes booleans, paths and emoji", () => {
+  const packs = join(tmpdir(), "emote-chat-packs");
   const settings = readConfig({
     stickerReply: true,
-    paths: ["D:\\packs"],
+    paths: [packs],
     emojiReply: 1,
     emojiRain: "yes",
   });
   assert.equal(settings.stickerReply, true);
   assert.equal(settings.emojiReply, false);
   assert.equal(settings.emojiRain, false);
-  assert.deepEqual(settings.paths, ["D:\\packs"]);
+  assert.deepEqual(settings.paths, [packs]);
 });
 
 test("readConfig unwraps volatile field references", () => {
@@ -65,16 +78,17 @@ test("readConfig unwraps volatile field references", () => {
   // lives behind `get()`. Reading the reference itself would silently ignore the
   // saved settings and behave as if every field were still at its default.
   const reference = (value) => ({ get: () => value });
+  const packs = join(tmpdir(), "emote-chat-packs");
   const settings = readConfig({
     stickerReply: reference(true),
-    paths: reference(["D:\\packs", "D:\\packs"]),
+    paths: reference([packs, packs]),
     emojiReply: reference(true),
     emojiRain: reference(false),
   });
   assert.equal(settings.stickerReply, true);
   assert.equal(settings.emojiReply, true);
   assert.equal(settings.emojiRain, false);
-  assert.deepEqual(settings.paths, ["D:\\packs"]);
+  assert.deepEqual(settings.paths, [packs]);
 });
 
 test("splitStickerId splits on the first slash only", () => {
