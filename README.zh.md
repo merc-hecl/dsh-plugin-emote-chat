@@ -87,15 +87,6 @@ D:\stickers\reactions     →  包 "reactions"   reactions/ok.gif →  [[sticker
 - SVG 必须声明尺寸（`width`/`height` 或 `viewBox`），否则渲染可能不符合预期。
 - 超过 12 MiB 的文件和超过四层的目录会被跳过。
 
-一个表情包只需要一个装着图片的目录。想造一个小包来试用（一张静态图、两个动图 GIF、一个声明了
-尺寸的 SVG）：
-
-```sh
-python scripts/make-sample-pack.py            # 生成到 samples/packs/whale
-```
-
-需要 Pillow（`pip install pillow`）。把 **表情包/贴纸读取路径** 指向它输出的目录即可。
-
 ### 回应存储
 
 回应保存在一个本地小文件里，所以重启后仍在原位：

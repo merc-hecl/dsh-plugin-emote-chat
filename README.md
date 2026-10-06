@@ -91,15 +91,6 @@ D:\stickers\reactions     →  pack "reactions"   reactions/ok.gif →  [[sticke
 - An SVG must declare a size (`width`/`height` or a `viewBox`), otherwise it may paint unpredictably.
 - Files over 12 MiB and folders deeper than four levels are skipped.
 
-A pack needs nothing but a folder of images. To make a small one for trying the feature out —
-a static image, two animated GIFs and an SVG with an explicit size — run:
-
-```sh
-python scripts/make-sample-pack.py            # writes samples/packs/whale
-```
-
-It needs Pillow (`pip install pillow`). Point **Sticker folders** at the directory it prints.
-
 ### Reaction storage
 
 Reactions are kept in a small local file so they are still there after a restart:

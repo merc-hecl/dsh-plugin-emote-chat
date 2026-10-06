@@ -14,9 +14,8 @@ Thumbs.db
 *.swp
 *~
 
-# 日志、诊断与生成样例
+# 日志与诊断
 *.log
 npm-debug.log*
 pnpm-debug.log*
 .scratch/
-samples/
