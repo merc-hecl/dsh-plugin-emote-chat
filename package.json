@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-emote-chat",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Sticker and emoji reactions for the DeepSeek Harness Web/Desktop chat: a composer sticker picker, agent stickers that render as images while the transcript keeps the pack tag, emoji reactions under the user bubble, and an emoji-rain effect.",
   "type": "module",
   "main": "lib/index.js",
