@@ -131,6 +131,15 @@ once; your messages are never touched.
 | No emoji rain | **Enable emoji rain** needs **Enable emoji replies** on. A reaction from before you opened the page shows as a chip, not as rain. |
 | Reactions vanished after a restart | Check that `$DSH_HOME/storages/` is writable; without the file, reactions are per-session. |
 
+## Acknowledgements
+
+The sticker interaction design draws on these projects:
+
+- [yyh-001/dsh-meme](https://github.com/yyh-001/dsh-meme): representing stickers as text in the conversation while rendering images in the chat UI.
+- [william-jin-cmu/dsh-stickers](https://github.com/william-jin-cmu/dsh-stickers): user and Agent sticker interactions backed by a shared catalog, with guidance for proactive Agent use.
+
+Thanks to their authors for sharing these designs and implementations.
+
 ## License
 
 MIT

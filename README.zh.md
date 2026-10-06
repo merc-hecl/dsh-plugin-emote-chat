@@ -126,6 +126,15 @@ $DSH_HOME/storages/emote-chat-reactions.json
 | 没有 emoji 雨 | **启用 emoji 雨** 需要先打开 **启用 emoji 回复**。打开页面前发生的回应只显示为气泡，不播雨。 |
 | 重启后回应不见了 | 检查 `$DSH_HOME/storages/` 是否可写；没有该文件时，回应只在当前进程内有效。 |
 
+## 参考与致谢
+
+本插件的贴纸交互设计参考了以下项目：
+
+- [yyh-001/dsh-meme](https://github.com/yyh-001/dsh-meme)：在会话中用文本表示贴纸，并在聊天界面将其渲染为图片的思路。
+- [william-jin-cmu/dsh-stickers](https://github.com/william-jin-cmu/dsh-stickers)：用户与 Agent 共用素材目录的贴纸交互，以及引导 Agent 主动使用贴纸的设计。
+
+感谢这些项目的作者公开分享设计与实现。
+
 ## 许可证
 
 MIT
