@@ -1,20 +1,20 @@
-# [INPUT]: 正式 GitHub Release、包元数据与 npm Trusted Publisher 授权
-# [OUTPUT]: Release 的 .tgz 安装包与 npm 同版本公开包
+# [INPUT]: 推送的 v版本号标签、包元数据与 npm Trusted Publisher 授权
+# [OUTPUT]: 自动创建的 GitHub Release、.tgz 安装包与 npm 同版本公开包
 # [POS]: 发布入口；测试通过才打包，向 GitHub 与 npm 分发同一安装包
 # [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
 name: Publish plugin
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 concurrency:
-  group: publish-${{ github.event.release.tag_name }}
+  group: publish-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   release:
-    if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.ref }}
 
       - uses: actions/setup-node@v6
         with:
@@ -32,11 +32,14 @@ jobs:
 
       - name: Check release version
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           node --input-type=module -e '
             import fs from "node:fs";
             const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            if (!/^\d+\.\d+\.\d+$/.test(pkg.version)) {
+              throw new Error("Only stable versions can be published by this workflow");
+            }
             if (process.env.RELEASE_TAG !== `v${pkg.version}`) {
               throw new Error("Release tag must match package.json version");
             }
@@ -50,11 +53,17 @@ jobs:
           mkdir -p dist
           npm pack --pack-destination dist
 
-      - name: Upload release asset
+      - name: Create release and upload asset
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$RELEASE_TAG" dist/*.tgz --clobber
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/*.tgz --clobber
+          else
+            gh release create "$RELEASE_TAG" dist/*.tgz \
+              --verify-tag --generate-notes --title "$RELEASE_TAG"
+          fi
 
       - name: Update npm for trusted publishing
         run: npm install -g npm@latest

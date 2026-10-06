@@ -55,7 +55,7 @@ npx @deepseek-ai/dsh plugin --profile web add link:/你的绝对路径/插件目
 
 ### npm
 
-本插件尚未发布到 npm。发布后可使用以下命令安装：
+使用以下命令安装已发布的 npm 包：
 
 ```sh
 npx @deepseek-ai/dsh plugin --profile web add dsh-plugin-emote-chat -w

@@ -60,7 +60,7 @@ Restart dsh and refresh the page after installation.
 
 ### npm
 
-The plugin has not been published to npm yet. Once it is published, you can install it with:
+Install the published package with:
 
 ```sh
 npx @deepseek-ai/dsh plugin --profile web add dsh-plugin-emote-chat -w

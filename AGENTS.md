@@ -6,7 +6,7 @@ lib/ - Host 业务模块及生成的 Client 入口；见 lib/AGENTS.md
 src/ - 浏览器源码；见 src/AGENTS.md
 scripts/ - 构建与宿主诊断；见 scripts/AGENTS.md
 test/ - 单元、DOM、订阅与宿主契约测试；见 test/AGENTS.md
-.github/ - Release 打包与 npm 同步发布；见 .github/AGENTS.md
+.github/ - 标签触发的自动 Release 与 npm 同步发布；见 .github/AGENTS.md
 .agents/ - 本地项目技能，不发布
 .scratch/ - 本地诊断产物，不发布
 </directory>

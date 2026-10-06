@@ -25,16 +25,16 @@
    | Environment name | 留空 |
    | Allowed actions | 允许直接 `npm publish` |
 
-4. 同步更新中英文 README，删除“尚未发布到 npm”的说明，提交并推送。无需配置仓库变量或 `NPM_TOKEN`；每个正式 Release 都会通过 OIDC 同步发布 npm。
+4. 无需配置仓库变量或 `NPM_TOKEN`；推送正式版本标签后，工作流创建 GitHub Release 并通过 OIDC 同步发布 npm。
 
 ## 正式 Release
 
 1. 确保工作区干净。修复版本执行 `npm version patch`，功能版本执行 `npm version minor`。该命令会更新包与锁文件、创建提交和 `v版本号` 标签。
 2. 执行 `git push origin main` 和 `git push origin v版本号`。首次已手动发布 `0.1.0` 时，自动发布从 `v0.1.1` 等新版本开始，避免重复发布同一 npm 版本。
-3. 在仓库 Releases 页面创建 Release，选择对应标签，填写说明，点击 **Publish release**。标签必须为 `v` 加包版本；不要选择 prerelease。
-4. 在 Actions 页面查看 `Publish plugin`。测试通过后，工作流上传 `dsh-plugin-emote-chat-版本号.tgz` 并将同一安装包发布到 npm。GitHub 自动生成的源码 ZIP 不是这个安装包。
+3. 在 Actions 页面查看 `Publish plugin`。标签必须为 `v` 加包版本，例如 `v0.1.1`；该工作流只接受 `数字.数字.数字` 的正式版本，不发布 prerelease。
+4. 测试通过后，工作流自动创建 GitHub Release、生成发布说明、上传 `dsh-plugin-emote-chat-版本号.tgz` 并将同一安装包发布到 npm。无需在网页手动创建 Release；GitHub 自动生成的源码 ZIP 不是这个安装包。
 
-该工作流必须已包含在发布标签指向的提交中。单独推送标签或保存 Release 草稿不会触发发布。
+该工作流必须已包含在发布标签指向的提交中。更新工作流后应先提交，再执行 `npm version patch` 创建新标签；只推送 `main` 或在网页创建 Release 不会触发发布。
 
 ## 验证与失败恢复
 
