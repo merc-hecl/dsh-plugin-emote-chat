@@ -37,18 +37,31 @@ description: "DeepSeek Harness 聊天的贴纸与 emoji 回应：输入框贴纸
 
 ### Desktop
 
-在 Desktop 的插件管理界面安装包含 `package.json` 的本地插件目录。
+从 [Releases](https://github.com/merc-hecl/dsh-plugin-emote-chat/releases) 下载 `.tgz` 插件安装包并解压，
+在 Desktop 的插件管理界面安装解压后包含 `package.json` 的 `package` 目录。
+如果尚无 Release，可以下载并解压 [源码压缩包](https://github.com/merc-hecl/dsh-plugin-emote-chat/archive/refs/heads/main.zip)，
+安装其根目录。两种方式均包含已构建的客户端。
 Desktop 0.2.0-rc.2 的专用 profile 由应用管理。
 
 ### Web
 
-需要可用的 dsh CLI 和 pnpm（`npm install -g pnpm`）。从本地目录安装：
+需要可用的 dsh CLI 和 pnpm（`npm install -g pnpm`）。下载并解压上面的安装包或源码压缩包，再安装其目录：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add link:/你的绝对路径/dsh-plugin-stickers -w
+npx @deepseek-ai/dsh plugin --profile web add link:/你的绝对路径/插件目录 -w
 ```
 
 安装后重启 dsh 并刷新页面。
+
+### npm
+
+本插件尚未发布到 npm。发布后可使用以下命令安装：
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web add dsh-plugin-emote-chat -w
+```
+
+安装遇到问题时，可 [提交 Issue](https://github.com/merc-hecl/dsh-plugin-emote-chat/issues)。
 
 <details>
 <summary>卸载 Web 插件</summary>

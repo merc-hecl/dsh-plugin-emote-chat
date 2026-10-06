@@ -41,18 +41,32 @@ Every label follows the harness UI language (`Settings → General → Language`
 
 ### Desktop
 
-Install the local plugin directory containing `package.json` through Desktop plugin management.
+Download the `.tgz` plugin package from [Releases](https://github.com/merc-hecl/dsh-plugin-emote-chat/releases),
+extract it, then install the extracted `package` directory containing `package.json` through Desktop plugin management.
+If no release is available yet, download and extract the [source archive](https://github.com/merc-hecl/dsh-plugin-emote-chat/archive/refs/heads/main.zip)
+and install its root directory instead. Both include the prebuilt client.
 Desktop 0.2.0-rc.2 manages its own profile.
 
 ### Web
 
-You need the dsh CLI and pnpm (`npm install -g pnpm`). Install from a local directory:
+You need the dsh CLI and pnpm (`npm install -g pnpm`). Download and extract the package or source archive above,
+then install its directory:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add link:/absolute/path/to/dsh-plugin-stickers -w
+npx @deepseek-ai/dsh plugin --profile web add link:/absolute/path/to/plugin-directory -w
 ```
 
 Restart dsh and refresh the page after installation.
+
+### npm
+
+The plugin has not been published to npm yet. Once it is published, you can install it with:
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web add dsh-plugin-emote-chat -w
+```
+
+For installation issues, [open an issue](https://github.com/merc-hecl/dsh-plugin-emote-chat/issues).
 
 <details>
 <summary>Remove the Web plugin</summary>

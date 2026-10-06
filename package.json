@@ -25,6 +25,18 @@
     "reaction"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/merc-hecl/dsh-plugin-emote-chat.git"
+  },
+  "homepage": "https://github.com/merc-hecl/dsh-plugin-emote-chat#readme",
+  "bugs": {
+    "url": "https://github.com/merc-hecl/dsh-plugin-emote-chat/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },

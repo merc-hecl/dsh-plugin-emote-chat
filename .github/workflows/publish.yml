@@ -1,0 +1,63 @@
+# [INPUT]: 正式 GitHub Release、包元数据与 npm Trusted Publisher 授权
+# [OUTPUT]: Release 的 .tgz 安装包与 npm 同版本公开包
+# [POS]: 发布入口；测试通过才打包，向 GitHub 与 npm 分发同一安装包
+# [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
+name: Publish plugin
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org/'
+          package-manager-cache: false
+
+      - name: Check release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            if (process.env.RELEASE_TAG !== `v${pkg.version}`) {
+              throw new Error("Release tag must match package.json version");
+            }
+          '
+
+      - run: npm ci
+      - run: npm run check
+
+      - name: Pack plugin
+        run: |
+          mkdir -p dist
+          npm pack --pack-destination dist
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/*.tgz --clobber
+
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Publish to npm
+        run: npm publish dist/*.tgz --access public

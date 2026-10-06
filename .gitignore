@@ -19,3 +19,7 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 .scratch/
+
+# 发布安装包
+dist/
+*.tgz
