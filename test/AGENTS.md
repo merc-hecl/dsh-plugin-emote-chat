@@ -4,6 +4,7 @@
 host.test.mjs: 跨平台配置路径归一化、目录扫描和贴纸完整 ID 的单元测试；素材路径采用系统原生路径
 client.test.mjs: 生成 bundle 的 VM 测试；覆盖 slots、静态设置 UI 与完整消息身份匹配
 settings.test.mjs: 真实配置适配器的设置集成回归；覆盖写入、重新读取、扫描结果和通知
+picker.test.mjs: 分组目录选择与完整贴纸 ID 插入；覆盖网格复位和目录刷新后的选择回退
 release-notes.test.mjs: 临时 Git 仓库验证标签范围、英文分类、贡献者与发布说明 CLI
 painter.test.mjs: 贴纸 DOM 回归；覆盖原文还原、宿主重渲染和不可用素材
 reaction-painter.test.mjs: 回应 DOM 回归；覆盖身份、清空、跨 epoch 更新与雨释放

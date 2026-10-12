@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 浏览器 document 与宿主主题 CSS 变量
- * [OUTPUT]: installStyles
+ * [OUTPUT]: installStyles；选择器目录与素材独立纵向滚动
  * [POS]: 浏览器样式生命周期；统一贴纸、设置、回应与 reduced-motion 表现
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -40,7 +40,7 @@ color: var(--dsw-alias-label-primary, #1a1a1a);
   position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;
   box-sizing: border-box;
   display: flex; flex-direction: column;
-  width: min(340px, 76vw); max-height: 360px;
+  width: min(440px, 76vw); max-height: min(360px, calc(100vh - 80px));
   border-radius: var(--dsw-radius-lg, 12px);
   background: var(--dsw-menu-surface-fill, var(--dsw-alias-bg-overlay, #fff));
   backdrop-filter: var(--dsw-menu-backdrop-filter, none);
@@ -81,16 +81,29 @@ color: var(--dsw-alias-label-secondary, #6b6b6b);
   outline-offset: 1px;
 }
 
-/* Pack chips: one row, one selected, no wrapping. */
-.ec-packs {
-  display: flex; flex-wrap: nowrap; gap: 4px;
-  padding: 0 12px 8px; overflow-x: auto; scrollbar-width: none;
+/* Direct folder navigation stays visible beside the independently scrolling grid. */
+.ec-picker-body {
+  display: grid; grid-template-columns: minmax(96px, 32%) minmax(0, 1fr);
+  height: min(288px, 48vh); min-height: 0;
+  border-top: .5px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, .16));
 }
-.ec-packs::-webkit-scrollbar { display: none; }
+.ec-packs {
+  min-height: 0; padding: 6px; overflow-y: auto; overflow-x: hidden;
+  border-right: .5px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, .16));
+  scrollbar-width: thin; scrollbar-color: var(--dsh-scrollbar-thumb) transparent;
+  overscroll-behavior: contain;
+}
+.ec-pack-group + .ec-pack-group { margin-top: 8px; }
+.ec-pack-root {
+  padding: 4px 8px; font-size: 11px; line-height: 16px;
+  color: var(--dsw-alias-label-tertiary, #8c8c8c);
+  overflow-wrap: anywhere;
+}
 .ec-pack {
-  appearance: none; flex: none;
-  border: 0; border-radius: var(--dsw-radius-sm, 6px); padding: 3px 9px;
-  font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap;
+  appearance: none; display: block; box-sizing: border-box; width: 100%; min-height: 32px;
+  border: 0; border-radius: var(--dsw-radius-sm, 6px); padding: 6px 8px;
+  font: inherit; font-size: 12px; line-height: 18px; text-align: left;
+  white-space: normal; overflow-wrap: anywhere;
   color: var(--dsw-alias-label-secondary, #6b6b6b);
   background: transparent; cursor: pointer;
   transition: color 180ms ease, background-color 180ms ease;
@@ -110,12 +123,21 @@ color: var(--dsw-alias-label-primary, #1a1a1a);
   outline-offset: -1px;
 }
 
+.ec-picker-content { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.ec-pack-title {
+  flex: none; padding: 10px 12px 6px; font-size: 12px; line-height: 18px;
+  color: var(--dsw-alias-label-secondary, #6b6b6b);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .ec-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 4px;
-  padding: 0 8px 8px; overflow-y: auto;
+  min-height: 0; align-content: start; padding: 0 8px 8px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--dsh-scrollbar-thumb) transparent;
+  overscroll-behavior: contain;
 }
 .ec-cell {
   appearance: none; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 0;
   padding: 6px 4px; border: 0; border-radius: var(--dsw-radius-md, 8px);
   background: transparent; cursor: pointer;
   transition: background-color 120ms ease;

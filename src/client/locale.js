@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 宿主 locale 文案键约定
- * [OUTPUT]: zh、en；设置说明与保存、扫描、清空操作的独立成功提示
+ * [OUTPUT]: zh、en；目录导航标签、设置说明与各操作的独立成功提示
  * [POS]: 共享双语文案；由 runtime 注册，组件不维护独立字典
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -34,6 +34,7 @@ const zh = {
   "section.loading": "加载中…",
   "picker.open": "发送贴纸/表情包",
   "picker.title": "贴纸",
+  "picker.packs": "表情包目录",
   "picker.close": "关闭",
   "picker.empty": "还没有可用表情包。请到「设置 → 贴纸互动」里填写表情包路径。",
   "picker.failed": "无法读取表情包目录：{message}",
@@ -81,6 +82,7 @@ const en = {
   "section.loading": "Loading…",
   "picker.open": "Send a sticker",
   "picker.title": "Stickers",
+  "picker.packs": "Sticker folders",
   "picker.close": "Close",
   "picker.empty":
     "No stickers yet. Add sticker folders in Settings → Stickers & emoji.",

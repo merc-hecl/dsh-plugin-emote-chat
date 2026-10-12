@@ -12,8 +12,8 @@ Stickers and emoji reactions for the DeepSeek Harness chat — Web and Desktop.
 
 ### Stickers
 
-- **A sticker button at the composer's left edge.** It opens a pack browser and inserts the
-  sticker you pick into the message you are writing. Nothing is sent for you.
+- **A sticker button at the composer's left edge.** Choose a folder from the scrolling list
+  on the left, then a sticker from the grid on the right. It inserts into your draft without sending.
 - **Stickers you send appear as images**, with the image on your side of the conversation and the
   message text below it.
 - **The Agent sends stickers too.** It can browse your available packs and stickers when needed,

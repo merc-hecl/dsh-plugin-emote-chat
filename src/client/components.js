@@ -1,6 +1,6 @@
 /**
  * [INPUT]: React、宿主 UI primitives 与 shared 的配置和素材工具
- * [OUTPUT]: StickerPicker、SettingsSection；保存、扫描和清空成功复用宿主 Toast
+ * [OUTPUT]: 分组目录与贴纸双栏选择器、SettingsSection 和宿主 Toast 提示
  * [POS]: 交互组件层；选择器只改草稿，设置通过 runtime 的写入适配器保存
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -150,6 +150,12 @@ function StickerPicker({ inputActions, t, catalog }) {
   }, [open]);
 
   const packs = snapshot.data?.packs ?? [];
+  const groups = new Map();
+  for (const pack of packs) {
+    const [root, ...children] = pack.name.split("/");
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push({ pack, label: children.join("/") || root });
+  }
   const active = packs.find((pack) => pack.id === packId) ?? packs[0];
   const stickers = active?.stickers ?? [];
 
@@ -223,51 +229,69 @@ function StickerPicker({ inputActions, t, catalog }) {
                 )
               : packs.length === 0
                 ? h("div", { className: "ec-note" }, t("picker.empty"))
-                : [
+                : h(
+                    "div",
+                    { className: "ec-picker-body" },
                     h(
-                      "div",
-                      { className: "ec-packs", key: "packs" },
-                      ...packs.map((pack) =>
+                      "nav",
+                      { className: "ec-packs", "aria-label": t("picker.packs") },
+                      ...[...groups].map(([root, children]) =>
                         h(
-                          "button",
-                          {
-                            key: pack.id,
-                            type: "button",
-                            className: "ec-pack",
-                            "aria-pressed":
-                              active?.id === pack.id ? "true" : "false",
-                            onClick: () => setPackId(pack.id),
-                          },
-                          pack.name,
+                          "div",
+                          { className: "ec-pack-group", key: root },
+                          h("div", { className: "ec-pack-root", title: root }, root),
+                          ...children.map(({ pack, label }) =>
+                            h(
+                              "button",
+                              {
+                                key: pack.id,
+                                type: "button",
+                                className: "ec-pack",
+                                title: pack.name,
+                                "aria-label": pack.name,
+                                "aria-pressed": active?.id === pack.id ? "true" : "false",
+                                onClick: () => {
+                                  setPackId(pack.id);
+                                  if (gridRef.current !== null) gridRef.current.scrollTop = 0;
+                                },
+                              },
+                              label,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                     h(
                       "div",
-                      { className: "ec-grid", key: "grid", ref: gridRef },
-                      ...stickers.map((sticker) =>
-                        h(
-                          "button",
-                          {
-                            key: sticker.id,
-                            type: "button",
-                            className: "ec-cell",
-                            title: sticker.id,
-                            "aria-label": t("sticker.alt", {
-                              name: sticker.id,
+                      { className: "ec-picker-content" },
+                      h("div", { className: "ec-pack-title", title: active.name }, active.name),
+                      h(
+                        "div",
+                        { className: "ec-grid", key: active.id, ref: gridRef },
+                        ...stickers.map((sticker) =>
+                          h(
+                            "button",
+                            {
+                              key: sticker.id,
+                              type: "button",
+                              className: "ec-cell",
+                              title: sticker.id,
+                              "aria-label": t("sticker.alt", {
+                                name: sticker.id,
+                              }),
+                              onClick: () => insert(sticker),
+                            },
+                            h("img", {
+                              src: stickerUrl(sticker.id),
+                              alt: "",
+                              loading: "lazy",
                             }),
-                            onClick: () => insert(sticker),
-                          },
-                          h("img", {
-                            src: stickerUrl(sticker.id),
-                            alt: "",
-                            loading: "lazy",
-                          }),
-                          h("span", null, sticker.name),
+                            h("span", null, sticker.name),
+                          ),
                         ),
                       ),
                     ),
-                  ],
+                  ),
         )
       : null,
   );
