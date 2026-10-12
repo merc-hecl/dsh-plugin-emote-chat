@@ -34,6 +34,10 @@
 3. 在 Actions 页面查看 `Publish plugin`。标签必须为 `v` 加包版本，例如 `v0.1.1`；该工作流只接受 `数字.数字.数字` 的正式版本，不发布 prerelease。
 4. 测试通过后，工作流自动创建 GitHub Release、生成发布说明、上传 `dsh-plugin-emote-chat-版本号.tgz` 并将同一安装包发布到 npm。无需在网页手动创建 Release；GitHub 自动生成的源码 ZIP 不是这个安装包。
 
+发布说明由 changelogen 根据上一正式版本到当前标签的提交生成；分类标题为英文，不加 emoji，条目保留提交消息、scope 和提交或 PR 链接。提交使用 `feat:`、`fix:`、`refactor:`、`chore:`、`docs:`、`test:`、`ci:` 等 Conventional Commits 前缀；不符合格式的提交不会列入变更分类。Contributors 列出本次提交的作者及 `Co-authored-by`，去重并排除机器人；能从 GitHub noreply 邮箱识别的用户附上主页链接，其余显示提交中的名字。首次发布读取完整历史，后续发布只读取当前标签可达的上一正式版本以来的提交。重跑工作流会更新该 Release 的说明。
+
+本地预览示例：`node scripts/release-notes.mjs v0.1.4 .scratch/release-notes-v0.1.4.md`。该脚本只生成 Markdown，不修改版本或创建标签。
+
 该工作流必须已包含在发布标签指向的提交中。更新工作流后应先提交，再执行 `npm version patch` 创建新标签；只推送 `main` 或在网页创建 Release 不会触发发布。
 
 ## 验证与失败恢复
