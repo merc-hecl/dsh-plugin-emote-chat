@@ -1,6 +1,6 @@
 /**
- * [INPUT]: node:test 与 Host/config/catalog/reaction 模块
- * [OUTPUT]: 单包生命周期、配置契约、存储和消息身份回归测试
+ * [INPUT]: node:test、受限宿主 Context 与 Host/config/catalog/reaction 模块
+ * [OUTPUT]: 单包生命周期、Desktop 配置条目契约、存储和消息身份回归测试
  * [POS]: 宿主适配回归；使用临时目录，禁止读取真实用户存储
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -58,6 +58,7 @@ async function mount(t, initial = {}, options = {}) {
     sections = [],
     disposers = [];
   let writes = 0;
+  const namespace = options.namespace ?? "emote-chat";
   const effect = (cb) => {
     const result = cb();
     if (typeof result === "function") disposers.push(result);
@@ -78,7 +79,7 @@ async function mount(t, initial = {}, options = {}) {
     },
     settings: {
       async update(ns, next) {
-        assert.equal(ns, "emote-chat");
+        assert.equal(ns, namespace);
         if (options.failWrite) throw new Error("disk refused");
         writes++;
         Object.assign(values, next);
@@ -87,7 +88,8 @@ async function mount(t, initial = {}, options = {}) {
   };
   let service;
   await apply(
-    {
+    new Proxy({
+      fiber: { entry: { options: { id: namespace } } },
       effect,
       provide: (_name, value) => (service = value),
       inject(names, cb) {
@@ -103,7 +105,14 @@ async function mount(t, initial = {}, options = {}) {
         },
       },
       logger: { warn() {} },
-    },
+    }, {
+      get(target, property, receiver) {
+        // Cordis rejects undeclared Context properties instead of returning undefined.
+        if (typeof property === "string" && !(property in target))
+          throw new Error(`cannot get property "${property}" without inject`);
+        return Reflect.get(target, property, receiver);
+      },
+    }),
     config,
   );
   function dispose() {
@@ -182,6 +191,26 @@ test("settings delegate to host and preserve paths; volatile changes stay live",
     app.tools.get("emote_reply").execute({ emoji: "✅" }, { agent: agent() }),
     /disabled/,
   );
+});
+test("every settings switch writes to the owning Loader entry", async (t) => {
+  const app = await mount(t, {}, { namespace: "custom-emotes" });
+  const paths = [join(app.dir, "stickers")];
+  for (const [field, value] of [
+    ["stickerReply", true],
+    ["stickerReply", false],
+    ["emojiReply", false],
+    ["emojiReply", true],
+    ["emojiRain", true],
+    ["emojiRain", false],
+  ]) {
+    const response = await app.request("settings", { [field]: value, paths });
+    const payload = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(payload));
+    assert.equal(payload.ok, true);
+    assert.equal(app.service.settings()[field], value);
+    assert.deepEqual(app.service.settings().paths, paths);
+  }
+  assert.equal(app.writes(), 6);
 });
 test("missing or refusing host settings return an explicit error", async (t) => {
   const missing = await mount(t, {}, { missing: "settings" });
