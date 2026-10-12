@@ -18,10 +18,9 @@ test("unload releases resources and reload creates one fresh subscription", asyn
   t.after(() => app.dispose());
   const first = app.mount();
   await flush();
-  app.tick(1200);
   await flush();
   assert.equal(app.observers.filter((o) => o.active).length, 1);
-  assert.equal(app.intervals.size, 2);
+  assert.equal(app.intervals.size, 1);
   assert.equal(app.frames.size, 1);
   assert.equal(app.slots.length, 3);
   assert.equal(app.dictionaries.size, 1);
@@ -44,11 +43,9 @@ test("unload releases resources and reload creates one fresh subscription", asyn
   const second = app.mount();
   assert.notEqual(second, first);
   await flush();
-  app.tick(1200);
-  app.tick(1200);
   await flush();
   assert.equal(app.observers.filter((o) => o.active).length, 1);
-  assert.equal(app.intervals.size, 2);
+  assert.equal(app.intervals.size, 1);
   assert.equal(app.slots.length, 3);
   assert.equal(app.head.childNodes.length, 1);
   assert.equal(second.debug().reactions.feedCount, 1);
@@ -70,7 +67,7 @@ test("unload removes projected stickers, reaction chips and rain while preservin
   row.appendChild(stack);
   const app = runtimeHarness({ roots: [row], fetch: async (url) => ({
     ok: true, json: async () => url.includes("/reactions?")
-      ? { epoch: "test", seq: 1, reactions: [{ seq: 1, messageId: "abc", emoji: "🎉" }] }
+      ? { epoch: "test", seq: 1, enabled: true, reactions: [{ seq: 1, messageId: "abc", emoji: "🎉" }] }
       : { stickerReply: true, emojiReply: true, packs: [{ id: "cats", stickers: [{ id: "cats/happy" }] }] },
   }) });
   t.after(() => app.dispose());
@@ -97,20 +94,18 @@ test("unload removes projected stickers, reaction chips and rain while preservin
 test("unload cancels feed backoff and disables future polling", async (t) => {
   const app = runtimeHarness({ fetch: async (url) => ({
     ok: true, json: async () => url.includes("/reactions?")
-      ? { epoch: "test", seq: 0, reactions: [] }
+      ? { epoch: "test", seq: 0, enabled: true, reactions: [] }
       : { emojiReply: true, paths: [], packs: [] },
   }) });
   t.after(() => app.dispose());
   app.mount();
   await flush();
-  app.tick(1200);
   await flush();
   app.frame();
   assert.equal(app.timers.size, 1, "the live feed is waiting to poll again");
   const before = app.requests.length;
   app.dispose();
   await flush();
-  app.tick(1200);
   app.tick(5000);
   app.frame();
   assert.equal(app.timers.size, 0);
@@ -134,4 +129,35 @@ test("a late config response after unload cannot overwrite the reloaded runtime"
   assert.equal(first.configStore.get().data, undefined);
   assert.deepEqual(Array.from(second.configStore.get().data.paths), ["new"]);
   assert.equal(app.sandbox.window.__emoteChat, second);
+});
+
+test("configuration changes start and stop the single feed without a session polling timer", async (t) => {
+  const app = runtimeHarness({ fetch: async (url, { signal }) => {
+    if (url.includes("/reactions?")) return new Promise((_resolve, reject) =>
+      signal.addEventListener("abort", () => reject(new DOMException("disabled", "AbortError")), { once: true }));
+    return { ok: true, json: async () => ({ emojiReply: false, paths: [], packs: [] }) };
+  } });
+  t.after(() => app.dispose());
+  const runtime = app.mount();
+  await flush();
+  assert.equal(runtime.debug().reactions.feedCount, 0);
+  assert.deepEqual([...app.intervals.values()].map((timer) => timer.ms), [5000]);
+  const setEnabled = (enabled) => runtime.configStore.set({
+    ...runtime.configStore.get(), data: { emojiReply: enabled },
+  });
+  setEnabled(true);
+  await flush();
+  const first = app.requests.find((request) => request.url.includes("/reactions?"));
+  assert.equal(first.options.signal.aborted, false);
+  setEnabled(true);
+  await flush();
+  assert.equal(app.requests.filter((request) => request.url.includes("/reactions?")).length, 1);
+  setEnabled(false);
+  await flush();
+  assert.equal(first.options.signal.aborted, true);
+  assert.equal(runtime.debug().reactions.feedCount, 0);
+  setEnabled(true);
+  await flush();
+  assert.equal(runtime.debug().reactions.feedCount, 1);
+  assert.equal(app.requests.filter((request) => request.url.includes("/reactions?")).length, 2);
 });

@@ -1,10 +1,10 @@
 /**
  * [INPUT]: 依赖共享 HTTP 与状态工具，读取 Host 的 epoch/revision 快照
  * [OUTPUT]: createReactionFeed
- * [POS]: 页面唯一 reaction 订阅；替换快照传播清空与淘汰，退出取消网络和等待
+ * [POS]: 页面唯一 reaction 订阅；仅接受当前 epoch/seq/完整快照协议，退出取消网络与等待
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
-import { API, createStore, getJson } from "./shared.js";
+import { API, STORE_LIMIT, createStore, getJson } from "./shared.js";
 export function createReactionFeed() {
   const store = createStore({ entries: [], status: "connecting" });
   const controller = new AbortController();
@@ -34,14 +34,18 @@ export function createReactionFeed() {
           controller.signal,
         );
         if (disposed) return;
+        if (typeof payload?.epoch !== "string" || !payload.epoch ||
+            !Number.isSafeInteger(payload.seq) || payload.seq < 0 ||
+            typeof payload.enabled !== "boolean" || !Array.isArray(payload.reactions))
+          throw new Error("invalid reaction snapshot");
         const sameEpoch = epoch === payload.epoch;
         const previous = new Map(
           store.get().entries.map((entry) => [entry.seq, entry]),
         );
         const entries = (
-          payload.enabled === false ? [] : (payload.reactions ?? [])
+          payload.enabled === false ? [] : payload.reactions
         )
-          .slice(-500)
+          .slice(-STORE_LIMIT)
           .map((entry) => ({
             ...entry,
             key: `${payload.epoch}:${entry.seq}`,
@@ -50,8 +54,8 @@ export function createReactionFeed() {
                 ? previous.get(entry.seq).live
                 : primed && sameEpoch && entry.seq > cursor,
           }));
-        epoch = payload.epoch ?? "";
-        cursor = payload.seq ?? 0;
+        epoch = payload.epoch;
+        cursor = payload.seq;
         primed = true;
         store.set({ entries, status: "ready" });
         delay = payload.enabled === false ? 2500 : 100;

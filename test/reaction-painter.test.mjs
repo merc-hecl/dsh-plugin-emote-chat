@@ -27,21 +27,21 @@ test("the reaction painter puts chips inside the user bubble", () => {
     flow.setAttribute("data-chat-node-key", key);
     const row = makeElement("div");
     const stack = makeElement("div");
-    stack.className = "_userStack_abc123";
+    stack.className = "cJsG2q_userStack";
     const bubble = makeElement("div");
-    bubble.className = "_bubble_abc123";
+    bubble.className = "cJsG2q_bubble";
     bubble.appendChild(makeText("hello"));
     stack.appendChild(bubble);
     row.appendChild(stack);
     flow.appendChild(row);
     return { flow, stack, bubble };
   };
-  const first = build("n1");
-  const second = build("n2");
+  const first = build("1:input-messagen1");
+  const second = build("2:input-messagen2");
   sandbox.document = chatDocument([first.flow, second.flow]);
 
   // A reaction binds only to the message it names.
-  const entries = [{ seq: 1, emoji: "🎉", messageKey: "n2", at: Date.now() }];
+  const entries = [{ seq: 1, emoji: "🎉", messageId: "n2", at: Date.now() }];
   exports.internals
     .createReactionPainter({ t: (key) => key, getEntries: () => entries })
     .scan();
@@ -71,43 +71,6 @@ test("the reaction painter puts chips inside the user bubble", () => {
   );
 });
 
-test("reactionHost is the bubble, with sensible fallbacks", () => {
-  const { exports } = loadBundle();
-  const { reactionHost } = exports.internals;
-  const flow = makeElement("div");
-  const row = makeElement("div");
-  const stack = makeElement("div");
-  stack.className = "_userStack_xyz";
-  const bubble = makeElement("div");
-  // The lookup is by class fragment, so a fixture without a class is not a bubble
-  // as far as this code is concerned — that omission is what made the assertion
-  // below fail while the implementation was correct.
-  bubble.className = "_bubble_xyz";
-  bubble.appendChild(makeText("hi"));
-  stack.appendChild(bubble);
-  row.appendChild(stack);
-  flow.appendChild(row);
-  assert.equal(
-    reactionHost(flow),
-    bubble,
-    "the bubble is the host, so the row sits at the foot of the message",
-  );
-  const bare = makeElement("div");
-  assert.equal(reactionHost(bare), bare, "a bare flow item is its own host");
-  const shallow = makeElement("div");
-  const only = makeElement("div");
-  shallow.appendChild(only);
-  assert.equal(reactionHost(shallow), only, "one level down is the fallback");
-  const named = makeElement("div");
-  const namedStack = makeElement("div");
-  namedStack.className = "_userStack_abc";
-  named.appendChild(namedStack);
-  assert.equal(
-    reactionHost(named),
-    namedStack,
-    "a stack is used when no bubble is found",
-  );
-});
 
 test("reactionHost anchors on the bubble with the desktop build's class names", () => {
   // The desktop bundle uses CSS-module hashes of the shape `cJsG2q_bubble`
@@ -134,18 +97,46 @@ test("reactionHost anchors on the bubble with the desktop build's class names", 
   );
 });
 
-test("reactionHost falls back to the row when no bubble element is found", () => {
-  // Some layouts skip the bubble wrapper; the row is then the best available host.
-  const { exports } = loadBundle();
+test("unsupported containers do not receive reaction chips", () => {
+  const { exports, sandbox } = loadBundle();
   const flow = makeElement("div");
-  const row = makeElement("div");
-  row.className = "cJsG2q_userRow";
-  const inner = makeElement("div");
-  inner.appendChild(makeText("hi"));
-  row.appendChild(inner);
-  flow.appendChild(row);
-  assert.equal(exports.internals.reactionHost(flow), row);
+  flow.setAttribute("data-chat-flow-kind", "user");
+  flow.setAttribute("data-chat-node-key", "1:input-messageabc");
+  const oldBubble = makeElement("div");
+  oldBubble.className = "_bubble_xyz";
+  flow.appendChild(oldBubble);
+  sandbox.document = chatDocument([flow]);
+  const painter = exports.internals.createReactionPainter({
+    getEntries: () => [{ seq: 1, emoji: "✅", messageId: "abc" }],
+  });
+  painter.scan();
+  assert.equal(exports.internals.reactionHost(flow), null);
+  assert.equal(chipRows(flow).length, 0);
 });
+
+test("replacing a bubble moves the decoration to its current host", () => {
+  const { exports, sandbox } = loadBundle();
+  const flow = makeElement("div");
+  flow.setAttribute("data-chat-flow-kind", "user");
+  flow.setAttribute("data-chat-node-key", "1:input-messageabc");
+  const first = makeElement("div"), second = makeElement("div");
+  first.className = second.className = "cJsG2q_bubble";
+  flow.appendChild(first);
+  sandbox.document = chatDocument([flow]);
+  const painter = exports.internals.createReactionPainter({
+    getEntries: () => [{ seq: 1, emoji: "✅", messageId: "abc" }],
+  });
+  painter.scan();
+  assert.equal(chipRows(first).length, 1);
+  flow.replaceChildren(second);
+  painter.scan();
+  assert.equal(chipRows(first).length, 0);
+  assert.equal(chipRows(second).length, 1);
+  flow.replaceChildren();
+  painter.scan();
+  assert.equal(chipRows(second).length, 0);
+});
+
 
 test("reaction decoration is hidden from the accessibility tree", () => {
   // 胶囊位于消息容器内；aria-hidden 只隔离读屏，不改变 DOM textContent。
@@ -156,9 +147,9 @@ test("reaction decoration is hidden from the accessibility tree", () => {
     flow.setAttribute("data-chat-node-key", key);
     const row = makeElement("div");
     const stack = makeElement("div");
-    stack.className = "_userStack_abc123";
+    stack.className = "cJsG2q_userStack";
     const bubble = makeElement("div");
-    bubble.className = "_bubble_abc123";
+    bubble.className = "cJsG2q_bubble";
     bubble.appendChild(makeText("hello"));
     stack.appendChild(bubble);
     row.appendChild(stack);
@@ -172,7 +163,7 @@ test("reaction decoration is hidden from the accessibility tree", () => {
     .createReactionPainter({
       t: (key) => key,
       getEntries: () => [
-        { seq: 1, emoji: "✅", messageKey: "13:input-messageaaaabbbb" },
+        { seq: 1, emoji: "✅", messageId: "aaaabbbb" },
       ],
     })
     .scan();
@@ -191,7 +182,7 @@ test("reaction decoration is hidden from the accessibility tree", () => {
   );
   assert.equal(
     [...(only.bubble.childNodes ?? [])].filter(
-      (node) => node.className === "_bubble_abc123",
+      (node) => node.className === "cJsG2q_bubble",
     ).length,
     0,
     "no nested bubble was created",
@@ -203,6 +194,9 @@ test("cleared snapshot removes a chip from a still-visible message", () => {
   const row = makeElement("div");
   row.setAttribute("data-chat-flow-kind", "user");
   row.setAttribute("data-chat-node-key", "1:input-messageabc");
+  const bubble = makeElement("div");
+  bubble.className = "cJsG2q_bubble";
+  row.appendChild(bubble);
   sandbox.document = chatDocument([row]);
   let entries = [{ seq: 1, emoji: "🎉", messageId: "abc" }];
   const painter = exports.internals.createReactionPainter({
@@ -221,6 +215,9 @@ test("restarted host with reused sequence updates the visible reaction", () => {
   const row = makeElement("div");
   row.setAttribute("data-chat-flow-kind", "user");
   row.setAttribute("data-chat-node-key", "1:input-messageabc");
+  const bubble = makeElement("div");
+  bubble.className = "cJsG2q_bubble";
+  row.appendChild(bubble);
   sandbox.document = chatDocument([row]);
   let entries = [{ seq: 1, key: "old:1", emoji: "🎉", messageId: "abc" }];
   const painter = exports.internals.createReactionPainter({

@@ -1,19 +1,16 @@
 /**
  * [INPUT]: React、宿主 slots/locale 以及配置、订阅、painter 和组件模块
  * [OUTPUT]: apply、inject 与测试用 internals
- * [POS]: 浏览器组装与释放边界；配置共用一个投影，所有页面共用一个回应订阅
+ * [POS]: 单一配置投影与回应订阅；保存后的强制刷新避开旧请求，卸载取消全部资源
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import * as React from "react";
 import {
   NS,
   API,
-  TOKEN_OPEN,
-  TOKEN_CLOSE,
   STORE_LIMIT,
   RAIN_COUNT,
   RAIN_FRESH_MS,
-  SESSION_WATCH_MS,
   mountLog,
   createStore,
   patchStore,
@@ -40,7 +37,6 @@ import {
   disposeRain,
 } from "./reactions.js";
 import { StickerPicker, SettingsSection } from "./components.js";
-import { findClassFragment } from "./dom.js";
 const h = React.createElement;
 const inject = ["slots", "locale"];
 
@@ -56,13 +52,17 @@ function apply(ctx) {
     status: "idle",
     data: undefined,
     error: undefined,
-    writable: true,
   });
   const controller = new AbortController();
   let pendingConfig;
   const configFace = {
     store: configStore,
-    load: () => {
+    load: async ({ fresh = false } = {}) => {
+      if (pendingConfig) {
+        const data = await pendingConfig;
+        if (!fresh || controller.signal.aborted) return data;
+      }
+      if (controller.signal.aborted) return undefined;
       if (pendingConfig) return pendingConfig;
       pendingConfig = (async () => {
         patchStore(configStore, { status: "loading" });
@@ -73,7 +73,6 @@ function apply(ctx) {
             status: "ready",
             data,
             error: undefined,
-            writable: configStore.get().writable,
           });
           return data;
         } catch (error) {
@@ -108,24 +107,17 @@ function apply(ctx) {
       return { ok: false, message: String(error.message ?? error) };
     }
   };
-  const context = {
-    update: (next) => writeSettings(next),
-  };
-
-  const catalogStore = configStore;
-  const catalogFace = configFace;
+  const context = { update: writeSettings };
 
   const runtime = {
     configStore,
-    catalogStore,
     configFace,
-    catalogFace,
     painter: undefined,
     chips: undefined,
   };
 
   ctx.effect(() => {
-    const feeds = new Map();
+    let feed;
     let feedUnsubscribe;
     const rainSeen = new Set();
 
@@ -136,16 +128,9 @@ function apply(ctx) {
     let frame = 0;
     const unsubscribes = [];
 
-    const currentSessionId = () =>
-      document
-        .querySelector("[data-conversation-session]")
-        ?.getAttribute("data-conversation-session") ?? undefined;
-
     const feedFor = () => {
-      let feed = feeds.get("global");
       if (!feed && configStore.get().data?.emojiReply === true) {
         feed = createReactionFeed();
-        feeds.set("global", feed);
         feedUnsubscribe = feed.store.subscribe(schedule);
       }
       return feed;
@@ -167,28 +152,26 @@ function apply(ctx) {
         }
       }
       if (configStore.get().data?.emojiRain !== true) return;
-      for (const feed of feeds.values()) {
-        for (const entry of feed.store.get().entries) {
-          if (!shouldRain(entry, Date.now(), rainSeen)) {
-            if (entry.live === true && !rainSeen.has(entry.key ?? entry.seq)) {
-              rainSeen.add(entry.key ?? entry.seq);
-              if (rainSeen.size > STORE_LIMIT * 2)
-                rainSeen.delete(rainSeen.values().next().value);
-              rainLog.skipped.push({
-                emoji: entry.emoji,
-                seq: entry.seq,
-                ageMs: Date.now() - (entry.at ?? 0),
-                why: "too-old",
-              });
-              if (rainLog.skipped.length > 12) rainLog.skipped.shift();
-            }
-            continue;
+      for (const entry of feed?.store.get().entries ?? []) {
+        if (!shouldRain(entry, Date.now(), rainSeen)) {
+          if (entry.live === true && !rainSeen.has(entry.key)) {
+            rainSeen.add(entry.key);
+            if (rainSeen.size > STORE_LIMIT * 2)
+              rainSeen.delete(rainSeen.values().next().value);
+            rainLog.skipped.push({
+              emoji: entry.emoji,
+              seq: entry.seq,
+              ageMs: Date.now() - (entry.at ?? 0),
+              why: "too-old",
+            });
+            if (rainLog.skipped.length > 12) rainLog.skipped.shift();
           }
-          rainSeen.add(entry.key ?? entry.seq);
-          rain(entry.emoji, RAIN_COUNT);
-          if (rainSeen.size > STORE_LIMIT * 2)
-            rainSeen.delete(rainSeen.values().next().value);
+          continue;
         }
+        rainSeen.add(entry.key);
+        rain(entry.emoji, RAIN_COUNT);
+        if (rainSeen.size > STORE_LIMIT * 2)
+          rainSeen.delete(rainSeen.values().next().value);
       }
     };
     function schedule() {
@@ -198,16 +181,25 @@ function apply(ctx) {
 
     painter = createStickerPainter({
       t,
-      getCatalog: () => catalogStore.get().data,
+      getCatalog: () => configStore.get().data,
       isEnabled: () => configStore.get().data?.stickerReply === true,
     });
     chips = createReactionPainter({
-      t,
       getEntries: () =>
         configStore.get().data?.emojiReply === true
           ? (feedFor()?.store.get().entries ?? [])
           : [],
     });
+    const syncFeed = () => {
+      if (configStore.get().data?.emojiReply === true) feedFor();
+      else if (feed) {
+        feedUnsubscribe();
+        feedUnsubscribe = undefined;
+        feed.dispose();
+        feed = undefined;
+      }
+      schedule();
+    };
     runtime.painter = painter;
     runtime.chips = chips;
 
@@ -217,21 +209,11 @@ function apply(ctx) {
       subtree: true,
       characterData: true,
     });
-    unsubscribes.push(configStore.subscribe(schedule));
+    unsubscribes.push(configStore.subscribe(syncFeed));
     const configTimer = setInterval(() => {
       void configFace.load();
     }, 5000);
     unsubscribes.push(() => clearInterval(configTimer));
-    const watcher = setInterval(() => {
-      if (configStore.get().data?.emojiReply === true) feedFor();
-      else if (feeds.size) {
-        feedUnsubscribe?.();
-        for (const feed of feeds.values()) feed.dispose();
-        feeds.clear();
-      }
-      schedule();
-    }, SESSION_WATCH_MS);
-
     void configFace.load().then(schedule);
     schedule();
 
@@ -260,12 +242,10 @@ function apply(ctx) {
         const host = reactionHost(flow);
         return {
           key: flow.getAttribute("data-chat-node-key"),
-          host: host.className || host.tagName,
-          hostHoldsBubble: findClassFragment(host, "bubble") !== null,
+          host: host?.className ?? null,
           chips: flow.querySelector("[data-emote-chips]")?.textContent ?? null,
         };
       });
-      const sessionId = currentSessionId();
       return {
         enabled: {
           stickerReply: configStore.get().data?.stickerReply === true,
@@ -273,7 +253,6 @@ function apply(ctx) {
           emojiRain: configStore.get().data?.emojiRain === true,
         },
         configStatus: configStore.get().status,
-        catalogStatus: catalogStore.get().status,
         // 保留近期雨的触发和跳过原因，便于定位展示故障。
         rain: {
           enabled: configStore.get().data?.emojiRain === true,
@@ -287,22 +266,20 @@ function apply(ctx) {
               'style[data-plugin-css="dsh-plugin-emote-chat"]',
             ) !== null,
         },
-        packs: (catalogStore.get().data?.packs ?? []).map((pack) => pack.id),
+        packs: (configStore.get().data?.packs ?? []).map((pack) => pack.id),
         flowCount: flows.length,
         flowsWithTokens: tokens,
         userMessages: users,
         reactions: {
-          sessionId: sessionId ?? null,
-          hosted: (feeds.get("global")?.store.get().entries ?? []).map(
+          hosted: (feed?.store.get().entries ?? []).map(
             (entry) => ({
               seq: entry.seq,
               emoji: entry.emoji,
               live: entry.live === true,
-              session: entry.session ?? null,
             }),
           ),
-          feedStatus: feeds.get("global")?.store.get().status ?? "disabled",
-          feedCount: feeds.size,
+          feedStatus: feed?.store.get().status ?? "disabled",
+          feedCount: feed ? 1 : 0,
         },
         mounts: { ...mountLog },
       };
@@ -310,12 +287,11 @@ function apply(ctx) {
     if (typeof window !== "undefined") window.__emoteChat = runtime;
 
     return () => {
-      clearInterval(watcher);
       observer.disconnect();
       if (frame !== 0) cancelAnimationFrame(frame);
       for (const unsubscribe of unsubscribes) unsubscribe();
-      for (const feed of feeds.values()) feed.dispose();
-      feeds.clear();
+      feed?.dispose();
+      feed = undefined;
       chips.dispose();
       feedUnsubscribe?.();
       painter.dispose();
@@ -378,7 +354,7 @@ function apply(ctx) {
         return h(StickerPicker, {
           inputActions: props.inputActions,
           t: props.t ?? t,
-          catalog: catalogFace,
+          catalog: configFace,
         });
       },
     ),
@@ -420,12 +396,9 @@ export const internals = {
   findSticker,
   messageIdOf,
   rowMatches,
-  stickerUrl,
   SettingsSection,
   shouldRain,
   RAIN_FRESH_MS,
-  TOKEN_OPEN,
-  TOKEN_CLOSE,
   createReactionFeed,
   rain,
   disposeRain,

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: Node VM/fs、可覆盖的 React/宿主原语和生成的客户端 bundle
  * [OUTPUT]: loadBundle、DOM 树和文本检查工具
- * [POS]: 测试共享fixture；模拟 ModuleLoader 与 React，不提供业务实现
+ * [POS]: 测试共享 fixture；模拟当前 DOM/Text 接口与宿主边界，不提供业务实现
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { readFileSync } from "node:fs";
@@ -44,15 +44,11 @@ function loadBundle({ react = {}, primitives = {}, ...overrides } = {}) {
         return {
           Switch: passthrough("button"),
           Button: passthrough("button"),
-          Input: passthrough("input"),
           Toast: passthrough("div"),
           IconCloseOutlineRegular: passthrough("svg"),
-          IconPlusOutlineRegular: passthrough("svg"),
           ...primitives,
         };
       }
-      if (spec === "react/jsx-runtime")
-        return { jsx: () => null, jsxs: () => null };
       throw new Error(`unexpected require("${spec}")`);
     },
     fetch: async () => ({ ok: true, json: async () => ({}) }),
@@ -156,9 +152,7 @@ function makeElement(tag) {
         : null;
     },
     appendChild(child) {
-      child.__parent = element;
-      element.childNodes.push(child);
-      return child;
+      return element.insertBefore(child, null);
     },
     insertBefore(child, before) {
       // A fragment contributes its children, not itself.
@@ -170,7 +164,8 @@ function makeElement(tag) {
       // Moving a node detaches it from where it was, exactly like the real DOM.
       // Without this the same node sits in two parents at once, so hoisting an image
       // to the row left a duplicate behind in the bubble.
-      if (child.__parent != null && child.__parent !== element) {
+      if (child === before) return child;
+      if (child.__parent != null) {
         child.__parent.childNodes = child.__parent.childNodes.filter(
           (c) => c !== child,
         );
@@ -212,6 +207,7 @@ function makeElement(tag) {
       element.__parent = null;
     },
     replaceChildren(...children) {
+      for (const child of element.childNodes) child.__parent = null;
       element.childNodes = [];
       for (const child of children) element.appendChild(child);
     },
@@ -226,6 +222,7 @@ function makeElement(tag) {
     },
     addEventListener() {},
     set textContent(value) {
+      for (const child of element.childNodes) child.__parent = null;
       element.childNodes = [];
       if (value !== "") element.appendChild(makeText(value));
     },
@@ -275,6 +272,12 @@ function makeText(value) {
       return node.nodeValue;
     },
     nodeValue: value,
+    after(sibling) {
+      const parent = node.parentElement;
+      if (!parent) return;
+      const next = parent.childNodes[parent.childNodes.indexOf(node) + 1];
+      parent.insertBefore(sibling, next ?? null);
+    },
   };
   return node;
 }

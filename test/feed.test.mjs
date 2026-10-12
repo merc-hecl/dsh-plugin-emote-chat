@@ -99,3 +99,23 @@ test("dispose aborts an in-flight request", async () => {
   await drain();
   assert.equal(signal.aborted, true);
 });
+
+test("the feed rejects legacy or incomplete snapshots and retains the last valid state", async () => {
+  const app = feedHarness([
+    { epoch: "current", seq: 1, enabled: true, reactions: [{ seq: 1, messageId: "abc", emoji: "✅" }] },
+    { seq: 2, reactions: [{ seq: 2, messageKey: "1:input-messageabc", emoji: "❌" }] },
+    { epoch: "current", seq: 3, enabled: true, reactions: [] },
+  ]);
+  try {
+    await drain();
+    await app.next();
+    assert.equal(app.feed.store.get().status, "error");
+    assert.equal(app.feed.store.get().entries[0].emoji, "✅");
+    assert.ok([...app.timers.values()][0].ms >= 2400);
+    await app.next();
+    assert.equal(app.feed.store.get().status, "ready");
+    assert.equal(app.feed.store.get().entries.length, 0);
+  } finally {
+    app.feed.dispose();
+  }
+});

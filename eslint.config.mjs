@@ -1,12 +1,12 @@
 /**
  * [INPUT]: ESLint flat config
- * [OUTPUT]: 未定义标识符与未使用导入检查
- * [POS]: 源码模块拆分的静态契约检查，不检查生成的 bundle
+ * [OUTPUT]: Host、Client、脚本与测试的未定义标识符和未使用变量检查
+ * [POS]: 全仓库手写 JavaScript 静态检查，不检查生成的 bundle
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 export default [
   {
-    files: ["lib/*.js", "src/client/*.js"],
+    files: ["lib/*.js", "src/client/*.js", "scripts/*.mjs", "test/*.mjs"],
     ignores: ["lib/client.js"],
     languageOptions: {
       globals: Object.fromEntries(
@@ -14,6 +14,7 @@ export default [
           "process",
           "Buffer",
           "Response",
+          "Request",
           "URL",
           "setTimeout",
           "clearTimeout",
@@ -28,7 +29,9 @@ export default [
           "requestAnimationFrame",
           "cancelAnimationFrame",
           "console",
-          "getComputedStyle",
+          "TextDecoder",
+          "DOMException",
+          "setImmediate",
         ].map((name) => [name, "readonly"]),
       ),
     },

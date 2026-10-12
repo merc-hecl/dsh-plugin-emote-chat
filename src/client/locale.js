@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 宿主 locale 文案键约定
- * [OUTPUT]: zh、en；目录导航标签、设置说明与各操作的独立成功提示
+ * [OUTPUT]: zh、en；当前设置与操作提示，无旧的进程内配置降级文案
  * [POS]: 共享双语文案；由 runtime 注册，组件不维护独立字典
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -30,7 +30,6 @@ const zh = {
   "section.scanned": "{packs} 个表情包 · {stickers} 张图片",
   "section.scanEmpty": "没有找到图片，请检查路径是否存在。",
   "section.scanError": "以下路径不可用：{paths}",
-  "section.unavailable": "当前部署没有可写的设置存储，修改只在本进程内生效。",
   "section.loading": "加载中…",
   "picker.open": "发送贴纸/表情包",
   "picker.title": "贴纸",
@@ -77,8 +76,6 @@ const en = {
   "section.scanned": "{packs} packs · {stickers} images",
   "section.scanEmpty": "No images found — check that the folders exist.",
   "section.scanError": "Unusable paths: {paths}",
-  "section.unavailable":
-    "This deployment cannot persist settings; changes apply to this process only.",
   "section.loading": "Loading…",
   "picker.open": "Send a sticker",
   "picker.title": "Stickers",

@@ -44,7 +44,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.mjs",
     "prepack": "npm run build",
-    "lint": "eslint lib src",
+    "lint": "eslint lib src scripts test",
     "check": "npm run lint && npm run build && npm test"
   },
   "dsh": {

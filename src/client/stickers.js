@@ -1,7 +1,7 @@
 /**
  * [INPUT]: shared 的标记解析和素材定位，dom 的容器查找
  * [OUTPUT]: createStickerPainter
- * [POS]: 可逆 DOM 投影；图片与隐藏原文并存，卸载恢复宿主文本和显示状态
+ * [POS]: 当前消息 flow 的可逆 DOM 投影；图片与隐藏原文并存，卸载恢复文本和显示状态
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import {
@@ -14,21 +14,9 @@ import {
   splitTokens,
 } from "./shared.js";
 import { findClassFragment } from "./dom.js";
-function sideOf(element, flow) {
-  const owner =
-    flow ??
-    element?.closest?.("[data-chat-flow-kind]") ??
-    element?.parentElement?.closest?.("[data-chat-flow-kind]") ??
-    null;
-  const kind = owner?.getAttribute?.("data-chat-flow-kind") ?? null;
-  return kind === "user" || kind === "steering" ? "right" : "left";
-}
-
 function rowOf(element) {
   return (
-    element?.closest?.(
-      "[data-time-hover-root], [data-chat-flow-kind], [data-chat-flow-key]",
-    ) ?? null
+    element?.closest?.("[data-chat-flow-kind]") ?? null
   );
 }
 
@@ -72,7 +60,7 @@ function trimOuterWhitespace(container) {
       node.nodeValue = value.slice(removed.length);
     } else {
       node.nodeValue = value.slice(0, -removed.length);
-      node.after ? node.after(ghost) : container.appendChild(ghost);
+      node.after(ghost);
     }
   };
   const first = [...container.childNodes].find((node) => !isGhost(node));
@@ -83,19 +71,10 @@ function trimOuterWhitespace(container) {
   if (last?.nodeType === 3) hide(last, false);
 }
 
-function stickerAnchor(inside, row) {
-  let element = inside;
-  while (element !== null && element !== row) {
-    if (
-      findClassFragment(element, "userstack") !== null ||
-      findClassFragment(element, "bubble") !== null
-    ) {
-      return element;
-    }
-    element = element.parentElement;
-  }
-  const bubble = inside?.closest?.("[class*='bubble']") ?? null;
-  if (bubble?.parentElement != null) return bubble.parentElement;
+function stickerAnchor(row) {
+  const kind = row.getAttribute("data-chat-flow-kind");
+  if (kind === "user" || kind === "steering")
+    return findClassFragment(row, "userStack");
   return row;
 }
 
@@ -116,10 +95,8 @@ function buildSticker(id, t) {
 }
 
 function createStickerPainter({ getCatalog, t, isEnabled }) {
-  const ghosts = new Set();
+  const ghosts = new Map();
   const hiddenElements = new Map();
-
-  let placedInThisPass = false;
 
   const ghostFor = (raw, stickerId) => {
     const ghost = document.createElement("span");
@@ -132,14 +109,22 @@ function createStickerPainter({ getCatalog, t, isEnabled }) {
     ghost.style.height = "0";
     ghost.style.overflow = "hidden";
     ghost.textContent = raw;
-    ghosts.add(ghost);
+    ghosts.set(ghost, undefined);
     return ghost;
   };
 
   const reconcile = () => {
-    for (const ghost of [...ghosts]) {
+    for (const [element, display] of hiddenElements) {
+      if (!element.isConnected) hiddenElements.delete(element);
+      else if (textWithoutGhosts(element).trim() !== "" || element.querySelector("[data-emote-sticker]") !== null) {
+        element.style.display = display;
+        hiddenElements.delete(element);
+      }
+    }
+    for (const [ghost, ownedFigure] of ghosts) {
       // 宿主已重建文本节点；下一轮扫描重新投影。
       if (ghost.parentElement === null || ghost.isConnected === false) {
+        ownedFigure?.remove();
         ghosts.delete(ghost);
         continue;
       }
@@ -154,14 +139,13 @@ function createStickerPainter({ getCatalog, t, isEnabled }) {
       if (figures.length === 1) continue;
       for (const extra of figures.slice(1)) extra.remove();
       if (figures.length >= 1) {
-        placedInThisPass = true;
         continue;
       }
       const figure = buildSticker(id, t);
-      figure.setAttribute("data-side", sideOf(ghost, row));
-      const anchor = stickerAnchor(ghost.parentElement ?? row, row);
+      const anchor = stickerAnchor(row);
+      if (anchor === null) continue;
       anchor.insertBefore(figure, anchor.firstChild);
-      placedInThisPass = true;
+      ghosts.set(ghost, figure);
     }
   };
 
@@ -172,7 +156,12 @@ function createStickerPainter({ getCatalog, t, isEnabled }) {
     }
     const catalog = getCatalog();
     if (catalog === undefined) return;
-    placedInThisPass = false;
+    // 目录移除素材后恢复原文，避免隐藏标记继续指向不可用图片。
+    if ([...ghosts.keys()].some((ghost) => {
+      const id = ghost.getAttribute("data-emote-token");
+      return id && findSticker(catalog, id) === undefined;
+    })) restore();
+    reconcile();
 
     const roots = document.querySelectorAll("[data-chat-flow-kind]");
     for (const root of roots) {
@@ -181,6 +170,8 @@ function createStickerPainter({ getCatalog, t, isEnabled }) {
       )
         continue;
       const row = rowOf(root) ?? root;
+      const anchor = stickerAnchor(row);
+      if (anchor === null) continue;
       // 已投影标记位于隐藏节点，不重复处理。
       const carriers = [];
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -211,7 +202,6 @@ function createStickerPainter({ getCatalog, t, isEnabled }) {
         if (placeable.length === 0) continue;
         const parent = carrier.parentElement;
         if (parent === null) continue;
-        const side = sideOf(carrier, root);
         // 原文与标记保留在文本位置；图片独立移到宿主消息容器，textContent 不变。
         const fragment = document.createDocumentFragment();
         const figures = [];
@@ -239,27 +229,26 @@ function createStickerPainter({ getCatalog, t, isEnabled }) {
             fragment.appendChild(document.createTextNode(raw));
             continue;
           }
-          fragment.appendChild(ghostFor(raw, segment.token));
+          const ghost = ghostFor(raw, segment.token);
+          fragment.appendChild(ghost);
           const figure = buildSticker(segment.token, t);
-          figure.setAttribute("data-side", side);
+          ghosts.set(ghost, figure);
           figures.push(figure);
         }
         parent.replaceChild(fragment, carrier);
         if (figures.length === 0) continue;
-        // 统一隐藏容器边缘空白，兼容宿主拆分文本节点。
+        // 统一隐藏容器边缘空白，保留宿主拆分的文本节点原文。
         trimOuterWhitespace(parent);
 
         // 图片进入宿主对齐容器；用户侧使用 userStack 的 flex-end 对齐。
-        const anchor = stickerAnchor(parent, row);
         for (const figure of figures) {
           anchor.insertBefore(figure, anchor.firstChild);
         }
-        placedInThisPass = true;
 
         // 隐藏只剩标记和空白的容器；卸载恢复原始显示状态。
         let element = parent;
         while (element !== null && element !== row) {
-          if (textWithoutGhosts(element).trim() === "") {
+          if (textWithoutGhosts(element).trim() === "" && element.querySelector("[data-emote-sticker]") === null) {
             if (!hiddenElements.has(element))
               hiddenElements.set(element, element.style.display);
             element.style.display = "none";
@@ -285,6 +274,6 @@ function createStickerPainter({ getCatalog, t, isEnabled }) {
     hiddenElements.clear();
     ghosts.clear();
   }
-  return { hasWork: () => placedInThisPass, scan, dispose: restore };
+  return { scan, dispose: restore };
 }
 export { createStickerPainter };

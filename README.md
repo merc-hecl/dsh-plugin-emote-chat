@@ -8,6 +8,8 @@ English | [中文](README.zh.md)
 
 Stickers and emoji reactions for the DeepSeek Harness chat — Web and Desktop.
 
+Uses the current DSH 0.2.0-rc.2 composer and message DOM contracts, without compatibility paths for older interfaces, class names, or subscription protocols. Existing v1 reaction storage remains in use.
+
 ## What it adds
 
 ### Stickers

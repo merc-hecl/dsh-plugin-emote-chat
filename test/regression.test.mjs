@@ -287,7 +287,6 @@ test("clear wakes subscription, replaces snapshot and persists revision", async 
   const clear = await (await app.request("clean", {})).json();
   assert.equal(clear.removed, 1);
   const after = await (await waiting).json();
-  assert.equal(after.reset, true);
   assert.ok(after.seq > before.seq);
   assert.deepEqual(after.reactions, []);
   const restored = createReactionStore({
@@ -309,11 +308,11 @@ test("store bounds, restores without duplication, and creates directory on teard
   assert.equal(restored.snapshot().seq, 505);
   assert.notEqual(store.snapshot().epoch, restored.snapshot().epoch);
 });
-test("disabled endpoint returns retry policy and no reactions", async (t) => {
+test("disabled endpoint returns immediately with no reactions", async (t) => {
   const app = await mount(t, { emojiReply: false });
   const result = await (await app.request("reactions?wait=1")).json();
   assert.equal(result.enabled, false);
-  assert.equal(result.retryAfterMs, 2500);
+  assert.deepEqual(result.reactions, []);
 });
 test("duplicate pack roots are rejected instead of aliasing images", async (t) => {
   const dir = await scratch(t);

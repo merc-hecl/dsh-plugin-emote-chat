@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 浏览器 document 与宿主主题 CSS 变量
- * [OUTPUT]: installStyles；选择器目录与素材独立纵向滚动
+ * [OUTPUT]: installStyles；当前 Desktop 组件与消息装饰样式，无旧投影规则
  * [POS]: 浏览器样式生命周期；统一贴纸、设置、回应与 reduced-motion 表现
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -185,23 +185,7 @@ transform var(--ds-transition-duration, 200ms) var(--ds-ease-in-out, cubic-bezie
   background: var(--dsw-alias-bg-layer-2, rgba(128, 128, 128, 0.12));
 }
 
-/* ── Settings page ────────────────────────────────────────────────────────────
- *
- * Every number here is copied from the shipped Settings surfaces rather than
- * invented, so this page cannot drift from the rest of the panel:
- *   row      flex, justify-between, gap 24, padding 16px 0,
- *            border-bottom .5px var(--dsw-alias-border-l2)
- *   title    14px / 20px, var(--dsw-alias-label-primary)
- *   desc     12px / 18px, var(--dsw-alias-label-secondary), margin-top 4px
- *   input    height 34, padding 0 12, border .5px var(--dsw-alias-border-l4),
- *            radius var(--dsw-radius-md), bg var(--dsw-alias-bg-layer-3)
- *
- * The shipped section strips the trailing separator with
- * "section > [item] > :last-child { border-bottom: none }". Generalised here to
- * "no separator under the last row of any group", because this page nests the
- * emoji-rain row inside the emoji-reply row and a descendant-only selector left
- * two stray rules at the bottom of the panel.
- */
+/* Settings rows use the host panel typography and spacing. */
 .ec-page { display: flex; flex-direction: column; width: 100%; }
 [data-item] {
   display: flex; justify-content: space-between; align-items: center;
@@ -294,27 +278,7 @@ color: var(--dsw-alias-label-secondary, #6b6b6b);
 .ec-note-line[data-tone='error'] { color: var(--dsw-alias-state-error-primary, #d43d3d); }
 .ec-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 
-/* ── Settings motion ──────────────────────────────────────────────────────────
- *
- * The parameters are the shipped panel's own: the CSS keyword ease at 100-150ms
- * plus a prefers-reduced-motion opt-out. DSH animates opacity here and nothing
- * else, so a page that scaled or slid would read as a foreign component — the
- * restraint IS the house style.
- *
- * Two places move, and neither is a write confirmation: the panel does not
- * acknowledge a successful save, so neither does this page. What is left is the
- * one thing the user cannot otherwise see — that the switch they just flipped
- * produced the section below it — and the stagger that shows a folder resolved
- * into actual stickers.
- *
- * These are TRANSITIONS with @starting-style, not animation keyframes. An
- * animation plays for as long as its element exists, so every re-render replayed
- * it and flipping a switch flashed the drawer and all the thumbnails; a
- * transition runs only when the property actually changes, and @starting-style
- * supplies the "before" state for the one frame the element first appears in.
- * Without @starting-style support the element simply appears: a missing entrance
- * must never leave content invisible.
- */
+/* Entry transitions do not replay on configuration refresh; Toast handles save feedback. */
 .ec-drawer,
 .ec-tile {
   opacity: 1;
@@ -347,24 +311,7 @@ transition: none;
 }
 
 /* ── Conversation decorations ─────────────────────────────────────────────── */
-/* The reactions form their own row INSIDE the bubble, the way a reaction strip
- * sits at the foot of a card.
- *
- * This is the fourth approach, and the first one the layout actually supports
- * without a trick. The bubble reports display: block and padding: 10px 16px,
- * so appending the row puts it on its own line under the message with no
- * positioning needed — the row inherits the bubble's content box and its
- * horizontal padding lines the pills up with the text. Absolute positioning
- * becomes the wrong tool: bottom: -(half the row) put a glyph on the border,
- * which is what the user rejected.
- *
- * The pills match the shipped pill primitive (Pill.module.css) value for value:
- * 24px tall, fully rounded, 4px gap, 8px horizontal padding, bg-layer-2 fill,
- * 12px text. Copying the numbers rather than rendering the React component is
- * deliberate: this row is decoration inside a node the plugin owns imperatively
- * (it is aria-hidden and has no interaction), and mounting a React root per
- * message would add lifecycle risk for no visual gain — the tokens are the same,
- * so the theme behaves identically. */
+/* Decorative chips live inside the Desktop bubble and use the host pill tokens. */
 .ec-chips {
   display: flex; flex-wrap: wrap; align-items: center;
   gap: 4px;
@@ -379,24 +326,6 @@ transition: none;
   border: none; border-radius: 999px;
   font-size: 12px; line-height: 18px;
   color: var(--dsw-alias-label-secondary, #6b6b6b);
-  /* A raised pill in BOTH themes, from one surface token plus the theme's own
-   * separator weight as a stroke.
-   *
-   * The fill is bg-layer-1, the topmost surface layer: #ffffff in the light theme,
-   * which is what a reaction pill on a pale blue bubble should look like, and
-   * #232324 in the dark one, which is DARKER than its #353638 bubble and so gives
-   * the pill an edge there.
-   *
-   * Two earlier attempts are worth recording, because both looked right on paper:
-   * the resting bg-layer-2 measured 1.15 against the dark bubble and simply
-   * vanished; and interactive-bg-active — a translucent wash — made the LIGHT pill
-   * a translucent grey-blue instead of white, which is the opposite of the intent.
-   * A wash cannot produce "white" in the light theme; only a surface token can.
-   *
-   * The stroke is border-l2, the same weight the chat uses for its own separators
-   * (#0000001a light, #ffffff1f dark). A fixed colour fails here: the primitive's
-   * button-ghost-active-border resolves to #979da6 in the light theme, a solid
-   * mid-grey that turned a 24px pill into a heavy outlined box. */
   background: var(--dsw-alias-bg-layer-1, #ffffff);
   box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.16));
   animation: ec-chip-in 220ms ease-out;
@@ -406,21 +335,10 @@ transition: none;
   to { opacity: 1; transform: none; }
 }
 [data-emote-sticker] { display: block; max-width: 100%; margin: 6px 0; }
-/* The image is parked in the element that also holds the bubble, so the chat's own
- * alignment applies: for a user message that element is display: flex with
- * align-items: flex-end, which puts the sticker on the same side as the message
- * without any positioning of ours. The auto margin is the fallback for a host where
- * the image lands in a block-level box — it is inert inside a flex container, and it
- * is what keeps a right-side sticker on the right otherwise. */
-[data-emote-sticker][data-side='right'] { margin-left: auto; text-align: right; }
+/* User stickers inherit the Desktop userStack alignment. */
 [data-emote-sticker] img {
   display: block; max-width: min(320px, 100%); max-height: 240px; width: auto; height: auto;
   border-radius: var(--dsw-radius-md, 8px); background: transparent;
-}
-[data-emote-sticker][data-side='right'] img { margin-left: auto; }
-[data-emote-sticker] figcaption {
-  margin-top: 2px; font-size: 11px; line-height: 16px;
-  color: var(--dsw-alias-label-tertiary, #8c8c8c);
 }
 [data-emote-sticker][data-failed] img { display: none; }
 .ec-tool-card { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; }
@@ -433,7 +351,6 @@ transition: none;
   border-radius: var(--dsw-radius-md, 8px);
 }
 .ec-tool-emoji { font-size: 22px; line-height: 28px; }
-.ec-hidden-token { display: none !important; }
 .ec-rain { position: fixed; inset: 0; z-index: 9999; pointer-events: none; overflow: hidden; }
 /* Rain falls: the glyphs wait above the viewport and travel down past it. The
  * first version started them below the fold and translated upward, which is a
@@ -449,7 +366,6 @@ transition: none;
   100% { transform: translate3d(var(--ec-drift, 0px), 118vh, 0) scale(1.05); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ec-rain > span { animation-duration: 1.5s !important; }
   .ec-chip { animation: none; }
 }`;
 

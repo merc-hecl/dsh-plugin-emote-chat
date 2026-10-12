@@ -2,6 +2,7 @@
 > L2 | 父级: ../AGENTS.md
 
 build.mjs: esbuild 构建入口；将浏览器模块打包为宿主 ModuleLoader 工厂
+auth.mjs: 三个本地诊断脚本共享的 browser-session grant 读取与 Cookie 签名；不回退无认证请求
 release-notes.mjs: changelogen 发布说明生成；读取标签间提交，只输出英文分类 Markdown
 boot-graph.mjs: 只读启动图诊断；检查认证页面清单与插件 bundle 路由
 probe.mjs: 只读 HTTP 诊断；用本地认证测试插件的准确路由

@@ -9,8 +9,6 @@ const NS = "emote";
 
 const API = "/api/emote-chat";
 
-const SETTINGS_NS = "emote-chat";
-
 const TOKEN_OPEN = "[[sticker:";
 const TOKEN_CLOSE = "]]";
 
@@ -35,8 +33,6 @@ const RAIN_COUNT = 26;
 const RAIN_FRESH_MS = 15000;
 
 const PREVIEW_LIMIT = 12;
-
-const SESSION_WATCH_MS = 1200;
 
 const mountLog = { mounts: 0, unmounts: 0, events: [] };
 
@@ -115,14 +111,7 @@ function findSticker(catalog, id) {
     const hit = (pack.stickers ?? []).find((sticker) => sticker.id === wanted);
     if (hit !== undefined) return hit;
   }
-  const at = wanted.indexOf("/");
-  if (at <= 0 || at === wanted.length - 1) return undefined;
-  const packId = wanted.slice(0, at);
-  const name = wanted.slice(at + 1);
-  const pack = packs.find(
-    (candidate) => candidate.id === packId || candidate.name === packId,
-  );
-  return pack?.stickers?.find((candidate) => candidate.name === name);
+  return undefined;
 }
 
 function splitTokens(text) {
@@ -149,7 +138,6 @@ function splitTokens(text) {
 export {
   NS,
   API,
-  SETTINGS_NS,
   TOKEN_OPEN,
   TOKEN_CLOSE,
   MESSAGE_ID_MARKER,
@@ -160,7 +148,6 @@ export {
   RAIN_COUNT,
   RAIN_FRESH_MS,
   PREVIEW_LIMIT,
-  SESSION_WATCH_MS,
   mountLog,
   createStore,
   patchStore,

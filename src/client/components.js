@@ -1,7 +1,7 @@
 /**
  * [INPUT]: React、宿主 UI primitives 与 shared 的配置和素材工具
  * [OUTPUT]: 分组目录与贴纸双栏选择器、SettingsSection 和宿主 Toast 提示
- * [POS]: 交互组件层；选择器只改草稿，设置通过 runtime 的写入适配器保存
+ * [POS]: 当前 Desktop 原语与输入接口；写入后读取有效配置，刷新失败不显示成功
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import * as React from "react";
@@ -124,7 +124,7 @@ function StickerPicker({ inputActions, t, catalog }) {
         setOpen(false);
         return;
       }
-      // 方向键按网格行列移动焦点，支持键盘选择贴纸。
+      // 方向键按贴纸顺序移动焦点。
       if (
         !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
       )
@@ -162,15 +162,8 @@ function StickerPicker({ inputActions, t, catalog }) {
   const insert = (sticker) => {
     const token = TOKEN_OPEN + sticker.id + TOKEN_CLOSE;
     try {
-      const span = inputActions?.captureInsertion?.();
-      if (
-        span !== undefined &&
-        typeof inputActions?.insertText === "function"
-      ) {
-        inputActions.insertText(token, span);
-      } else if (typeof inputActions?.setDraft === "function") {
-        inputActions.setDraft(token);
-      }
+      const span = inputActions.captureInsertion();
+      inputActions.insertText(token, span);
     } catch {
       /* the composer refuses edits while it is submitting; nothing to do */
     }
@@ -304,6 +297,8 @@ function SettingsSection({ t, config, context }) {
   const [alert, setAlert] = React.useState(null);
 
   const [busy, setBusy] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const savePending = React.useRef(false);
   const [maintenance, setMaintenance] = React.useState(null);
   const [toast, setToast] = React.useState(null);
   const toastSequence = React.useRef(0);
@@ -317,9 +312,11 @@ function SettingsSection({ t, config, context }) {
   React.useEffect(() => {
     mountLog.mounts += 1;
     mountLog.events.push({ at: Date.now(), kind: "mount" });
+    if (mountLog.events.length > 24) mountLog.events.shift();
     return () => {
       mountLog.unmounts += 1;
       mountLog.events.push({ at: Date.now(), kind: "unmount" });
+      if (mountLog.events.length > 24) mountLog.events.shift();
     };
   }, []);
 
@@ -338,23 +335,32 @@ function SettingsSection({ t, config, context }) {
   const lines = linesDraft ?? (saved.length === 0 ? [""] : saved);
 
   const commit = async (next, successKey = "section.saved") => {
-    setToast(null);
-    const result = await context.update({
-      stickerReply: next.stickerReply,
-      paths: splitLines((next.lines ?? []).join("\n")),
-      emojiReply: next.emojiReply,
-      emojiRain: next.emojiReply ? next.emojiRain : false,
-    });
-    if (!result.ok) {
-      // 写入失败显式报错；成功后从宿主重新读取有效配置。
-      setAlert(t("section.saveFailed", { message: result.message ?? "" }));
-      return false;
+    if (savePending.current) return false;
+    savePending.current = true;
+    setSaving(true);
+    try {
+      setToast(null);
+      const result = await context.update({
+        stickerReply: next.stickerReply,
+        paths: splitLines((next.lines ?? []).join("\n")),
+        emojiReply: next.emojiReply,
+        emojiRain: next.emojiReply ? next.emojiRain : false,
+      });
+      if (!result.ok) {
+        // 写入失败显式报错；成功后从宿主重新读取有效配置。
+        setAlert(t("section.saveFailed", { message: result.message ?? "" }));
+        return false;
+      }
+      setAlert(null);
+      const refreshed = await config.load({ fresh: true });
+      if (refreshed === undefined) return false;
+      setLinesDraft(null);
+      showSuccess(t(successKey));
+      return true;
+    } finally {
+      savePending.current = false;
+      setSaving(false);
     }
-    setAlert(null);
-    setLinesDraft(null);
-    await config.load();
-    showSuccess(t(successKey));
-    return true;
   };
 
   const clearAll = async () => {
@@ -362,7 +368,7 @@ function SettingsSection({ t, config, context }) {
     setBusy(true);
     setToast(null);
     try {
-      await postJson(API + "/clean", { mode: "all" });
+      await postJson(API + "/clean", {});
       setMaintenance(null);
       showSuccess(t("section.store.cleared"));
     } catch (error) {
@@ -405,6 +411,7 @@ function SettingsSection({ t, config, context }) {
         type: "text",
         spellCheck: false,
         value,
+        disabled: saving,
         "data-missing": broken.has(value) ? "true" : undefined,
         placeholder: t("section.paths.placeholder"),
         "aria-label": t("section.paths.label"),
@@ -420,7 +427,7 @@ function SettingsSection({ t, config, context }) {
         {
           type: "button",
           className: "ec-remove",
-          disabled: lines.length <= 1,
+          disabled: saving || lines.length <= 1,
           "aria-label": t("section.paths.remove"),
           title: t("section.paths.remove"),
           onClick: () => setLinesDraft(lines.filter((_, at) => at !== index)),
@@ -430,9 +437,7 @@ function SettingsSection({ t, config, context }) {
     );
 
   const preview = packs
-    .flatMap((pack) =>
-      (pack.stickers ?? []).map((sticker) => ({ pack: pack.id, sticker })),
-    )
+    .flatMap((pack) => pack.stickers ?? [])
     .slice(0, PREVIEW_LIMIT);
 
   const drawer = h(
@@ -449,7 +454,7 @@ function SettingsSection({ t, config, context }) {
       { className: "ec-path-row" },
       h(
         Button,
-        { onClick: () => setLinesDraft([...lines, ""]) },
+        { onClick: () => setLinesDraft([...lines, ""]), disabled: saving },
         t("section.paths.add"),
       ),
     ),
@@ -457,7 +462,7 @@ function SettingsSection({ t, config, context }) {
       ? h(
           "div",
           { className: "ec-preview" },
-          ...preview.map(({ sticker }) =>
+          ...preview.map((sticker) =>
             h(
               "span",
               { className: "ec-tile", key: sticker.id, title: sticker.id },
@@ -500,6 +505,7 @@ function SettingsSection({ t, config, context }) {
           Button,
           // 重写当前值使 Host 索引失效，再读取扫描结果。
           {
+            disabled: saving,
             onClick: () =>
               void commit({ ...settings, lines }, "section.scanCompleted"),
           },
@@ -509,6 +515,7 @@ function SettingsSection({ t, config, context }) {
           Button,
           {
             variant: "primary",
+            disabled: saving,
             onClick: () => void commit({ ...settings, lines }),
           },
           t("section.save"),
@@ -536,9 +543,6 @@ function SettingsSection({ t, config, context }) {
           t("section.loadFailed", { message: snapshot.error ?? "" }),
         )
       : null,
-    snapshot.writable === false
-      ? h("p", { className: "ec-note-line" }, t("section.unavailable"))
-      : null,
     alert === null
       ? null
       : h(
@@ -554,6 +558,7 @@ function SettingsSection({ t, config, context }) {
         control: h(Switch, {
           label: t("section.stickerReply.label"),
           checked: settings.stickerReply,
+          disabled: saving,
           onToggle: (value) =>
             void commit({ ...settings, stickerReply: value, lines }),
         }),
@@ -568,6 +573,7 @@ function SettingsSection({ t, config, context }) {
         control: h(Switch, {
           label: t("section.emojiReply.label"),
           checked: settings.emojiReply,
+          disabled: saving,
           onToggle: (value) =>
             void commit({
               ...settings,
@@ -584,6 +590,7 @@ function SettingsSection({ t, config, context }) {
             control: h(Switch, {
               label: t("section.emojiRain.label"),
               checked: settings.emojiRain,
+              disabled: saving,
               onToggle: (value) =>
                 void commit({ ...settings, lines, emojiRain: value }),
             }),

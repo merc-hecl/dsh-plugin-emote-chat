@@ -8,6 +8,8 @@ description: "DeepSeek Harness 聊天的贴纸与 emoji 回应：输入框贴纸
 
 为 DeepSeek Harness 聊天（Web 与 Desktop）提供贴纸与 emoji 回应。
 
+使用当前 DSH 0.2.0-rc.2 的输入与消息 DOM 契约；不保留旧接口、旧类名或旧订阅协议的兼容路径。现有 v1 回应存储继续使用。
+
 ## 功能
 
 ### 贴纸

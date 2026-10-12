@@ -26,8 +26,6 @@ const sticker = (id, name = id.split("/").pop()) => ({
   id,
   name,
   file: "private-path",
-  bytes: 999,
-  etag: "private-hash",
 });
 
 test("pack discovery paginates summaries and exposes them in model-visible output", async () => {
@@ -78,7 +76,7 @@ test("nested pack query returns complete sticker IDs with no filesystem data", a
   assert.deepEqual(Object.keys(second.stickers[0]).sort(), ["id", "name"]);
   assert.doesNotMatch(
     app.tool.output.render({}, second)[0].text,
-    /private-path|private-hash/,
+    /private-path/,
   );
   assert.equal(second.hasMore, false);
 });

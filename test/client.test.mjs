@@ -1,7 +1,7 @@
 /**
  * [INPUT]: node:test、VM 与生成的客户端 bundle
  * [OUTPUT]: 客户端注册、静态 UI 和宿主消息身份匹配测试
- * [POS]: 客户端测试入口；独立夹具隔离真实浏览器
+ * [POS]: 客户端测试入口；独立 fixture 隔离真实浏览器
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { test } from "node:test";
@@ -90,14 +90,10 @@ function loadBundle(overrides = {}) {
         return {
           Switch: passthrough("button"),
           Button: passthrough("button"),
-          Input: passthrough("input"),
           Toast: passthrough("div"),
           IconCloseOutlineRegular: passthrough("svg"),
-          IconPlusOutlineRegular: passthrough("svg"),
         };
       }
-      if (spec === "react/jsx-runtime")
-        return { jsx: () => null, jsxs: () => null };
       throw new Error(`unexpected require("${spec}")`);
     },
     fetch: async () => ({
@@ -309,9 +305,10 @@ test("the rain gate plays a recent live reaction and nothing else", () => {
   const { exports } = loadBundle();
   const { shouldRain, RAIN_FRESH_MS } = exports.internals;
   const now = 1_000_000;
-  const fresh = { seq: 1, emoji: "🎉", live: true, at: now - 2_000 };
+  const fresh = { seq: 1, key: "test:1", emoji: "🎉", live: true, at: now - 2_000 };
   const stale = {
     seq: 2,
+    key: "test:2",
     emoji: "🎉",
     live: true,
     at: now - RAIN_FRESH_MS - 1,
@@ -333,7 +330,7 @@ test("the rain gate plays a recent live reaction and nothing else", () => {
     "a priming entry never rains",
   );
   assert.equal(
-    shouldRain(fresh, now, new Set([fresh.seq])),
+    shouldRain(fresh, now, new Set([fresh.key])),
     false,
     "a sequence rains once",
   );
@@ -343,7 +340,7 @@ test("the rain gate plays a recent live reaction and nothing else", () => {
     "a malformed entry is ignored",
   );
   assert.equal(
-    shouldRain({ seq: 3, live: true, at: now - RAIN_FRESH_MS }, now, new Set()),
+    shouldRain({ seq: 3, key: "test:3", live: true, at: now - RAIN_FRESH_MS }, now, new Set()),
     true,
     "the boundary counts as fresh",
   );
@@ -442,23 +439,6 @@ test("reactions resolve full Host message IDs and reject partial IDs", () => {
   assert.equal(assignReactions([{ seq: 3, emoji: "🎉", messageId: "77778888" }], [oldRow]).size, 0);
 });
 
-test("a named messageKey wins over timing", () => {
-  const { exports } = loadBundle();
-  const { assignReactions } = exports.internals;
-  const rowA = makeStubNode("div");
-  rowA.setAttribute("data-chat-node-key", "A");
-  const rowB = makeStubNode("div");
-  rowB.setAttribute("data-chat-node-key", "B");
-  const placed = assignReactions(
-    [{ seq: 1, emoji: "👏", messageKey: "A", at: 99999 }],
-    [rowA, rowB],
-  );
-  assert.deepEqual(
-    [...placed.keys()],
-    [rowA],
-    "the Host's own anchor is authoritative",
-  );
-});
 
 // Static element-tree checks cover folder errors and catalog previews.
 // Interactive writes and reloads are exercised through the real adapter in settings.test.mjs.
@@ -466,7 +446,7 @@ test("a named messageKey wins over timing", () => {
 /** A config face whose store returns a fixed snapshot. */
 function settingsFace(data) {
   return {
-    store: { get: () => ({ status: "ready", data, writable: true }) },
+    store: { get: () => ({ status: "ready", data }) },
     load: async () => {},
   };
 }
@@ -648,12 +628,9 @@ test("a chip restored from the store finds its message by id", () => {
   row.setAttribute("data-chat-node-key", "13:input-message" + ID);
 
   assert.equal(messageIdOf("13:input-message" + ID), ID);
-  assert.equal(messageIdOf(ID), ID, "a bare id is already an id");
+  assert.equal(messageIdOf(ID), undefined, "a bare id is not a current Host node key");
   assert.ok(rowMatches(row, { messageId: ID }), "an id-only entry matches");
-  assert.ok(
-    rowMatches(row, { messageKey: "13:input-message" + ID }),
-    "a full key still matches",
-  );
+  assert.equal(rowMatches(row, { messageKey: "13:input-message" + ID }), false, "key-only legacy reactions are rejected");
   assert.ok(
     !rowMatches(row, { messageId: "other" }),
     "a different message does not match",

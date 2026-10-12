@@ -16,6 +16,16 @@ import {
   allElements,
 } from "./dom-fixture.mjs";
 
+function addUserStack(flow) {
+  const kind = flow.getAttribute("data-chat-flow-kind");
+  if (kind !== "user" && kind !== "steering") return;
+  if (allElements(flow).some((node) => node.className === "cJsG2q_userStack")) return;
+  const stack = makeElement("div");
+  stack.className = "cJsG2q_userStack";
+  for (const child of [...flow.childNodes]) stack.appendChild(child);
+  flow.appendChild(stack);
+}
+
 test("splitTokens separates prose from sticker tokens", () => {
   const { exports } = loadBundle();
   const { splitTokens } = exports.internals;
@@ -56,6 +66,26 @@ test("findSticker resolves a pack/name id against the catalog", () => {
     exports.internals.findSticker(undefined, "whale/happy"),
     undefined,
   );
+  assert.equal(exports.internals.findSticker({
+    packs: [{ id: "whale", name: "whale", stickers: [{ id: "another/happy", name: "happy" }] }],
+  }, "whale/happy"), undefined, "pack/name labels cannot alias a different sticker ID");
+});
+
+test("the painter leaves an unsupported old user container as original text", () => {
+  const { exports, sandbox } = loadBundle();
+  const flow = makeElement("div");
+  flow.setAttribute("data-chat-flow-kind", "user");
+  const stack = makeElement("div");
+  stack.className = "_userStack_abc123";
+  stack.appendChild(makeText("[[sticker:whale/happy]]"));
+  flow.appendChild(stack);
+  sandbox.document = chatDocument([flow]);
+  exports.internals.createStickerPainter({
+    getCatalog: () => ({ packs: [{ id: "whale", stickers: [{ id: "whale/happy" }] }] }),
+    isEnabled: () => true, t: (key) => key,
+  }).scan();
+  assert.equal(stickerFigures(flow).length, 0);
+  assert.equal(flow.textContent, "[[sticker:whale/happy]]");
 });
 
 test("the sticker keeps the text intact and hoists its image", () => {
@@ -68,6 +98,7 @@ test("the sticker keeps the text intact and hoists its image", () => {
     selector === "[data-chat-flow-kind]" ? root : null;
   paragraph.appendChild(carrier);
   root.appendChild(paragraph);
+  addUserStack(root);
   sandbox.document = chatDocument([root]);
 
   const catalog = {
@@ -90,7 +121,6 @@ test("the sticker keeps the text intact and hoists its image", () => {
   const figures = stickerFigures(root);
   assert.equal(figures.length, 1, "exactly one figure for one token");
   assert.equal(figures[0].getAttribute("data-emote-sticker"), "whale/happy");
-  assert.equal(figures[0].getAttribute("data-side"), "left");
 
   // Invariant 1 — THE one that matters. Any surface comparing textContent to decide
   // "this message was modified" rewrites the DOM otherwise, and the image is lost.
@@ -135,9 +165,9 @@ test("a sticker followed by a sentence keeps the sentence", () => {
   const root = makeElement("div");
   root.setAttribute("data-chat-flow-kind", "user");
   const stack = makeElement("div");
-  stack.className = "_userStack_abc123";
+  stack.className = "cJsG2q_userStack";
   const bubble = makeElement("div");
-  bubble.className = "_bubble_abc123";
+  bubble.className = "cJsG2q_bubble";
   const paragraph = makeElement("p");
   const carrier = makeText(
     "[[sticker:whale/happy]]\ncan you see this sticker?",
@@ -148,6 +178,7 @@ test("a sticker followed by a sentence keeps the sentence", () => {
   bubble.appendChild(paragraph);
   stack.appendChild(bubble);
   root.appendChild(stack);
+  addUserStack(root);
   sandbox.document = chatDocument([root]);
 
   const catalog = {
@@ -195,6 +226,7 @@ test("a token the catalog does not know stays as text", () => {
     selector === "[data-chat-flow-kind]" ? root : null;
   paragraph.appendChild(makeText("look [[sticker:ghost/missing]] here"));
   root.appendChild(paragraph);
+  addUserStack(root);
   sandbox.document = chatDocument([root]);
 
   exports.internals
@@ -225,6 +257,7 @@ test("a scan before the settings load does not retire the message", () => {
   const carrier = makeText("[[sticker:whale/thanks]]");
   paragraph.appendChild(carrier);
   root.appendChild(paragraph);
+  addUserStack(root);
   sandbox.document = chatDocument([root]);
 
   const catalog = {
@@ -267,7 +300,6 @@ test("a scan before the settings load does not retire the message", () => {
     1,
     "the message must still be painted once the catalog arrives",
   );
-  assert.equal(figures[0].getAttribute("data-side"), "right");
 });
 
 test("a token the catalog does not know stays eligible for a later scan", () => {
@@ -279,6 +311,7 @@ test("a token the catalog does not know stays eligible for a later scan", () => 
     selector === "[data-chat-flow-kind]" ? root : null;
   paragraph.appendChild(makeText("[[sticker:whale/notyet]]"));
   root.appendChild(paragraph);
+  addUserStack(root);
   sandbox.document = chatDocument([root]);
 
   const empty = { packs: [] };
@@ -320,6 +353,7 @@ test("the painter ignores tokens inside code blocks", () => {
   code.appendChild(makeText("[[sticker:whale/happy]]"));
   pre.appendChild(code);
   root.appendChild(pre);
+  addUserStack(root);
   sandbox.document = chatDocument([root]);
 
   const catalog = {
@@ -380,6 +414,7 @@ test("the painter only paints message flow kinds", () => {
       selector === "[data-chat-flow-kind]" ? flow : null;
     paragraph.appendChild(makeText("here you go [[sticker:whale/happy]]"));
     flow.appendChild(paragraph);
+    addUserStack(flow);
     sandbox.document = chatDocument([flow]);
     painter().scan();
     assert.equal(
@@ -397,6 +432,7 @@ test("the painter only paints message flow kinds", () => {
       selector === "[data-chat-flow-kind]" ? flow : null;
     paragraph.appendChild(makeText("here you go [[sticker:whale/happy]]"));
     flow.appendChild(paragraph);
+    addUserStack(flow);
     sandbox.document = chatDocument([flow]);
     painter().scan();
     assert.equal(
@@ -415,7 +451,7 @@ test("a sticker on its own line leaves no blank line above the text", () => {
   const root = makeElement("div");
   root.setAttribute("data-chat-flow-kind", "user");
   const bubble = makeElement("div");
-  bubble.className = "_bubble_abc123";
+  bubble.className = "cJsG2q_bubble";
   const paragraph = makeElement("p");
   const carrier = makeText(
     "[[sticker:whale/happy]]\nI sent another sticker, take a look",
@@ -425,6 +461,7 @@ test("a sticker on its own line leaves no blank line above the text", () => {
   paragraph.appendChild(carrier);
   bubble.appendChild(paragraph);
   root.appendChild(bubble);
+  addUserStack(root);
   sandbox.document = chatDocument([root]);
 
   const catalog = {
@@ -468,6 +505,7 @@ test("an unresolvable tag keeps its own spacing", () => {
     selector === "[data-chat-flow-kind]" ? root : null;
   paragraph.appendChild(carrier);
   root.appendChild(paragraph);
+  addUserStack(root);
   sandbox.document = chatDocument([root]);
 
   exports.internals
@@ -494,7 +532,7 @@ test("a reclaimed sticker image is restored on the next scan", () => {
   const root = makeElement("div");
   root.setAttribute("data-chat-flow-kind", "user");
   const bubble = makeElement("div");
-  bubble.className = "_bubble_abc123";
+  bubble.className = "cJsG2q_bubble";
   const paragraph = makeElement("p");
   const carrier = makeText("[[sticker:whale/happy]]\ntake a look");
   carrier.closest = (selector) =>
@@ -502,6 +540,7 @@ test("a reclaimed sticker image is restored on the next scan", () => {
   paragraph.appendChild(carrier);
   bubble.appendChild(paragraph);
   root.appendChild(bubble);
+  addUserStack(root);
   sandbox.document = chatDocument([root]);
 
   const catalog = {
@@ -539,11 +578,6 @@ test("a reclaimed sticker image is restored on the next scan", () => {
   const restored = stickerFigures(root);
   assert.equal(restored.length, 1, "the next scan puts the image back");
   assert.equal(restored[0].getAttribute("data-emote-sticker"), "whale/happy");
-  assert.equal(
-    painter.hasWork(),
-    true,
-    "and the pass reports that it did something",
-  );
   assert.equal(stickerFigures(root).length, 1, "with no duplicate");
 });
 
@@ -555,9 +589,9 @@ test("a rebuilt row is painted from scratch", () => {
     const root = makeElement("div");
     root.setAttribute("data-chat-flow-kind", "user");
     const stack = makeElement("div");
-    stack.className = "_userStack_abc123";
+    stack.className = "cJsG2q_userStack";
     const bubble = makeElement("div");
-    bubble.className = "_bubble_abc123";
+    bubble.className = "cJsG2q_bubble";
     const paragraph = makeElement("p");
     const carrier = makeText("[[sticker:whale/happy]] take a look");
     carrier.closest = (selector) =>
@@ -622,6 +656,7 @@ test("sticker disable and unload restore exact original text including whitespac
   const original = "[[sticker: whale/happy ]]\n  hello\n";
   paragraph.appendChild(makeText(original));
   row.appendChild(paragraph);
+  addUserStack(row);
   sandbox.document = chatDocument([row]);
   let enabled = true;
   const painter = exports.internals.createStickerPainter({
@@ -643,4 +678,63 @@ test("sticker disable and unload restore exact original text including whitespac
   painter.dispose();
   assert.equal(row.textContent, original);
   assert.equal(stickerFigures(row).length, 0);
+});
+
+function projectedUser() {
+  const { exports, sandbox } = loadBundle();
+  const flow = makeElement("div"), stack = makeElement("div"), bubble = makeElement("div");
+  const paragraph = makeElement("p");
+  flow.setAttribute("data-chat-flow-kind", "user");
+  stack.className = "cJsG2q_userStack";
+  bubble.className = "cJsG2q_bubble";
+  paragraph.textContent = "[[sticker:whale/happy]]";
+  bubble.appendChild(paragraph);
+  stack.appendChild(bubble);
+  flow.appendChild(stack);
+  sandbox.document = chatDocument([flow]);
+  let catalog = { packs: [{ id: "whale", stickers: [{ id: "whale/happy" }] }] };
+  const painter = exports.internals.createStickerPainter({
+    getCatalog: () => catalog, isEnabled: () => true, t: (key) => key,
+  });
+  return { flow, stack, bubble, paragraph, painter, setCatalog: (next) => { catalog = next; } };
+}
+
+test("a sticker-only message keeps its userStack visible", () => {
+  const ui = projectedUser();
+  ui.painter.scan();
+  assert.equal(stickerFigures(ui.flow)[0].parentElement, ui.stack);
+  assert.notEqual(ui.stack.style.display, "none");
+  assert.equal(ui.bubble.style.display, "none", "the empty text bubble is hidden separately");
+  ui.painter.dispose();
+  assert.equal(ui.flow.textContent, "[[sticker:whale/happy]]");
+});
+
+test("host text replacement removes its old projection and restores text visibility", () => {
+  const ui = projectedUser();
+  ui.painter.scan();
+  ui.paragraph.textContent = "replacement text";
+  ui.painter.scan();
+  assert.equal(stickerFigures(ui.flow).length, 0);
+  assert.equal(ui.flow.textContent, "replacement text");
+  assert.notEqual(ui.bubble.style.display, "none");
+  assert.notEqual(ui.paragraph.style.display, "none");
+  ui.paragraph.textContent = "[[sticker:whale/happy]]";
+  ui.painter.scan();
+  assert.equal(stickerFigures(ui.flow).length, 1);
+  ui.paragraph.textContent = "[[sticker:whale/happy]]";
+  ui.painter.scan();
+  assert.equal(stickerFigures(ui.flow).length, 1, "replacing a ghost must not duplicate its image");
+  ui.painter.dispose();
+});
+
+test("removing a sticker from the catalog restores its marker and original display", () => {
+  const ui = projectedUser();
+  ui.painter.scan();
+  ui.setCatalog({ packs: [] });
+  ui.painter.scan();
+  assert.equal(stickerFigures(ui.flow).length, 0);
+  assert.equal(ui.flow.textContent, "[[sticker:whale/happy]]");
+  assert.notEqual(ui.paragraph.style.display, "none");
+  assert.notEqual(ui.bubble.style.display, "none");
+  ui.painter.dispose();
 });

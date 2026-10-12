@@ -1,5 +1,5 @@
 /**
- * [INPUT]: Node crypto/fs 与 DSH settings describe/mutate 协议
+ * [INPUT]: 共享 browserCookie 与当前 DSH settings describe/mutate RPC
  * [OUTPUT]: 配置及素材诊断，显式 --write 时执行 revision 保护的更新
  * [POS]: 开发集成诊断；默认只读，不通过文本编辑 profile
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
@@ -7,7 +7,7 @@
 /**
  * Verification driver for a running dsh Web/Desktop process.
  *
- * It speaks the same wire protocol the Settings page uses: a credentialed POST
+ * It inspects the host namespaces through the native Settings RPC protocol: a credentialed POST
  * of a `client-request` envelope to `/api/settings/*`, the Connection bridge's
  * unary RPC channel. `settings/describe` reports each plugin's configurable
  * namespaces, and `settings/mutate` performs the write the page performs.
@@ -18,10 +18,8 @@
  * Without `--write` it only reads.
  */
 
-import { createHash, createHmac, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { browserCookie } from "./auth.mjs";
 
 const argv = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -33,34 +31,7 @@ const has = (name) => argv.includes(`--${name}`);
 const base = flag("base", process.env.DSH_WEB_URL ?? "http://127.0.0.1:19387").replace(/\/$/u, "");
 const namespace = flag("ns", "emote-chat");
 const packDir = flag("pack", undefined);
-const home = process.env.DSH_HOME ?? join(homedir(), ".dsh");
-
-function readSecret(text) {
-  const lines = text.split(/\r?\n/u);
-  let inRecord = false;
-  for (const line of lines) {
-    if (/^\S/u.test(line) && line.trim() !== "") inRecord = false;
-    if (/^\s{2}client-connection\/browser-session:\s*$/u.test(line)) {
-      inRecord = true;
-      continue;
-    }
-    if (!inRecord) continue;
-    const match = /^\s+secret\s*:\s*(\S+)\s*$/u.exec(line);
-    if (match !== null) return match[1].replace(/^["']|["']$/gu, "");
-  }
-  return undefined;
-}
-
-const encodeBase64Url = (value) =>
-  Buffer.from(value).toString("base64").replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
-
-const authority = new URL(base).host;
-const secret = Buffer.from(readSecret(readFileSync(join(home, ".credentials.yaml"), "utf8")), "base64url");
-const payload = { version: 1, authority, issuedAt: Date.now(), expiresAt: Date.now() + 3_600_000 };
-const body = encodeBase64Url(Buffer.from(JSON.stringify(payload), "utf8"));
-const cookie = `dsh-auth-${createHash("sha256").update(authority).digest("base64url")}=v1.${body}.${encodeBase64Url(
-  createHmac("sha256", secret).update(body).digest(),
-)}`;
+const cookie = browserCookie(base);
 
 /**
  * POST one unary RPC call through the Connection bridge.
@@ -79,7 +50,7 @@ async function call(invocation, args) {
       type: "client-request",
       rpcId,
       method: endpoint,
-      payload: { args: Array.isArray(args) ? { values: args } : args },
+      payload: { args },
     }),
   });
   const text = await response.text();
@@ -89,15 +60,16 @@ async function call(invocation, args) {
   } catch {
     parsed = undefined;
   }
-  if (parsed === undefined) return { http: response.status, raw: text.slice(0, 600) };
+  if (!response.ok || typeof parsed?.result?.ok !== "boolean")
+    return { error: { message: `invalid settings RPC response (${response.status})` } };
   if (parsed.result?.ok === false) return { error: parsed.result.error };
-  return { value: parsed.result?.value ?? parsed.result };
+  return { value: parsed.result.value };
 }
 
 const describe = () =>
   call("@deepseek-ai/dsh-api-settings-controller#settings/describe", {});
 
-/** Apply one live-field patch, retrying once on a revision conflict. */
+/** Apply one live-field patch with up to three attempts on revision conflict. */
 async function patch(fields) {
   const ops = Object.entries(fields).map(([field, value]) => ({ op: "set", path: [field], value }));
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -125,8 +97,9 @@ async function patch(fields) {
 /** GET one plugin route with the browser cookie. */
 async function api(path) {
   const response = await fetch(`${base}${path}`, { headers: { cookie } });
-  const text = await response.text();
-  return { status: response.status, type: response.headers.get("content-type"), text };
+  const bytes = await response.arrayBuffer();
+  const text = new TextDecoder().decode(bytes);
+  return { status: response.status, type: response.headers.get("content-type"), text, bytes: bytes.byteLength };
 }
 
 console.log(`verify: ${base} (namespace ${namespace})`);
@@ -165,7 +138,7 @@ try {
 const first = parsed?.packs?.[0]?.stickers?.[0];
 if (first !== undefined) {
   const image = await api(`/api/emote-chat/sticker?id=${encodeURIComponent(first.id)}`);
-  console.log(`sticker ${image.status} ${image.type} ${image.text.length} bytes (id ${first.id})`);
+  console.log(`sticker ${image.status} ${image.type} ${image.bytes} bytes (id ${first.id})`);
 } else {
   console.log("sticker: no sticker in the catalog yet");
 }

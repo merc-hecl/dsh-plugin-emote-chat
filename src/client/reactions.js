@@ -1,48 +1,30 @@
 /**
  * [INPUT]: shared 的显示上限和时效，dom 的消息容器查找
  * [OUTPUT]: createReactionPainter、消息匹配、rain、disposeRain 与诊断信息
- * [POS]: 只按宿主消息身份显示回应；管理雨的完整字素和卸载清理
+ * [POS]: 按稳定 messageId 与当前 Desktop bubble 显示回应，不回退旧消息 key 或容器
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { MESSAGE_ID_MARKER, MAX_CHIPS, RAIN_FRESH_MS } from "./shared.js";
 import { findClassFragment } from "./dom.js";
 function reactionHost(flow) {
-  const bubble = findClassFragment(flow, "bubble");
-  if (bubble !== null) return bubble;
-  const stack = findClassFragment(flow, "userstack");
-  if (stack !== null) return stack;
-  const row = findClassFragment(flow, "userrow");
-  if (row !== null) return row;
-  return flow.firstElementChild ?? flow;
+  return findClassFragment(flow, "bubble");
 }
 
 function messageIdOf(key) {
   const text = String(key ?? "");
-  const at = text.indexOf(MESSAGE_ID_MARKER);
-  return at === -1 ? text : text.slice(at + MESSAGE_ID_MARKER.length);
+  const match = new RegExp(`^\\d+:${MESSAGE_ID_MARKER}(.+)$`, "u").exec(text);
+  return match?.[1];
 }
 
 function rowMatches(row, entry) {
-  const nodeKey = row.getAttribute("data-chat-node-key");
-  if (nodeKey !== null) {
-    if (entry.messageKey !== undefined && entry.messageKey === nodeKey)
-      return true;
-    if (
-      entry.messageId !== undefined &&
-      messageIdOf(nodeKey) === entry.messageId
-    )
-      return true;
-  }
-  return false;
+  return typeof entry.messageId === "string" &&
+    messageIdOf(row.getAttribute("data-chat-node-key")) === entry.messageId;
 }
 
 function assignReactions(entries, messages) {
   const byMessage = new Map();
   for (const entry of entries) {
     if (entry?.seq === undefined) continue;
-    if (entry.messageKey === undefined && entry.messageId === undefined)
-      continue;
-    // 优先节点 key，持久化或宿主重建后用稳定 messageId 匹配。
     const row = messages.find((candidate) => rowMatches(candidate, entry));
     if (row === undefined) continue;
     const list = byMessage.get(row) ?? [];
@@ -75,10 +57,17 @@ function createReactionPainter({ getEntries }) {
       }
     }
     for (const [row, list] of byMessage) {
+      const host = reactionHost(row);
+      if (host === null) {
+        rows.get(row)?.remove();
+        rows.delete(row);
+        continue;
+      }
       const shown = list.slice(-MAX_CHIPS);
       let chips = rows.get(row);
       // React 可能回收插件追加的节点，断开时重新建立胶囊行。
-      if (chips !== undefined && !chips.isConnected) {
+      if (chips !== undefined && chips.parentElement !== host) {
+        chips.remove();
         chips = undefined;
         rows.delete(row);
       }
@@ -88,11 +77,11 @@ function createReactionPainter({ getEntries }) {
         chips.setAttribute("data-emote-chips", "");
         // 胶囊是装饰，aria-hidden 避免读屏将其当成用户消息内容。
         chips.setAttribute("aria-hidden", "true");
-        reactionHost(row).append(chips);
+        host.append(chips);
         rows.set(row, chips);
       }
       const signature = JSON.stringify(
-        shown.map((entry) => [entry.key ?? entry.seq, entry.emoji]),
+        shown.map((entry) => [entry.key, entry.emoji]),
       );
       if (chips.getAttribute("data-si") === signature) continue;
       chips.setAttribute("data-si", signature);
@@ -118,8 +107,8 @@ function createReactionPainter({ getEntries }) {
 }
 
 function shouldRain(entry, now, seen) {
-  if (entry?.live !== true) return false;
-  if (seen.has(entry.key ?? entry.seq)) return false;
+  if (entry?.live !== true || typeof entry.key !== "string") return false;
+  if (seen.has(entry.key)) return false;
   return now - (entry.at ?? 0) <= RAIN_FRESH_MS;
 }
 

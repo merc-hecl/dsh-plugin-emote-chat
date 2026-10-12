@@ -15,7 +15,7 @@ test/ - 单元、DOM、订阅与宿主契约测试；见 test/AGENTS.md
 package.json - 唯一发布包；Host/Client 入口、构建、静态检查及测试命令
 package-lock.json - npm 构建与开发依赖锁定
 cordis.patch.yml - 单 Host row，Client 由 package manifest 发现
-eslint.config.mjs - 源码未定义标识符及未使用变量检查
+eslint.config.mjs - Host、Client、诊断脚本和测试的未定义标识符及未使用变量检查
 .gitignore - 排除本地技能、依赖、日志和诊断产物
 .gitattributes - 仓库文本行尾规则
 README.md、README.zh.md - 插件功能、安装、配置与使用说明

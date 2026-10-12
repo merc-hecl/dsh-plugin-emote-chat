@@ -1,5 +1,5 @@
 /**
- * [INPUT]: Node crypto/fs 与本地 DSH 浏览器会话认证
+ * [INPUT]: 共享 browserCookie 与当前宿主启动清单
  * [OUTPUT]: 启动清单和 bundle 路由的只读诊断输出
  * [POS]: 开发诊断脚本；不进入发布包，不改变宿主配置
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
@@ -15,41 +15,11 @@
  *   node scripts/boot-graph.mjs [baseUrl]
  */
 
-import { createHash, createHmac } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { browserCookie } from "./auth.mjs";
 
 const base = (process.argv[2] ?? process.env.DSH_WEB_URL ?? "http://127.0.0.1:19387").replace(/\/$/u, "");
-const home = process.env.DSH_HOME ?? join(homedir(), ".dsh");
 const packageName = "dsh-plugin-emote-chat";
-
-function readSecret(text) {
-  const lines = text.split(/\r?\n/u);
-  let inRecord = false;
-  for (const line of lines) {
-    if (/^\S/u.test(line) && line.trim() !== "") inRecord = false;
-    if (/^\s{2}client-connection\/browser-session:\s*$/u.test(line)) {
-      inRecord = true;
-      continue;
-    }
-    if (!inRecord) continue;
-    const match = /^\s+secret\s*:\s*(\S+)\s*$/u.exec(line);
-    if (match !== null) return match[1].replace(/^["']|["']$/gu, "");
-  }
-  return undefined;
-}
-
-const encodeBase64Url = (value) =>
-  Buffer.from(value).toString("base64").replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
-
-const authority = new URL(base).host;
-const secret = Buffer.from(readSecret(readFileSync(join(home, ".credentials.yaml"), "utf8")), "base64url");
-const payload = { version: 1, authority, issuedAt: Date.now(), expiresAt: Date.now() + 3_600_000 };
-const body = encodeBase64Url(Buffer.from(JSON.stringify(payload), "utf8"));
-const cookie = `dsh-auth-${createHash("sha256").update(authority).digest("base64url")}=v1.${body}.${encodeBase64Url(
-  createHmac("sha256", secret).update(body).digest(),
-)}`;
+const cookie = browserCookie(base);
 
 const index = await fetch(`${base}/`, { headers: { cookie } });
 const html = await index.text();

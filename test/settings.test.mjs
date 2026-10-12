@@ -64,6 +64,9 @@ async function page(t, { update, fetch, configFetch, initial = {}, locale = zh }
         if (result.ok) Object.assign(hostData, next);
         return { ok: result.ok, json: async () => result };
       }
+      if (url.includes("/reactions?")) return {
+        ok: true, json: async () => ({ epoch: "test", seq: 0, enabled: hostData.emojiReply, reactions: [] }),
+      };
       return fetch ? fetch(url, options) : {
         ok: true, json: async () => ({ ok: true, removed: 7 }),
       };
@@ -152,6 +155,23 @@ test("editing folders shows no success until the host acknowledges the save", as
   assert.equal(ui.toast().props.text, zh["section.saved"]);
 });
 
+test("an in-flight save disables editing and rejects another stale write", async (t) => {
+  let acknowledge;
+  const ui = await page(t, { update: () => new Promise((resolve) => { acknowledge = resolve; }) });
+  ui.toggle("section.emojiRain.label").props.onToggle(true);
+  assert.equal(ui.button("section.save").props.disabled, true);
+  assert.equal(ui.button("section.scan").props.disabled, true);
+  assert.equal(ui.render().find((node) => node.type === "input").props.disabled, true);
+  assert.equal(ui.toggle("section.emojiReply.label").props.disabled, true);
+  ui.toggle("section.emojiReply.label").props.onToggle(false);
+  ui.button("section.save").props.onClick();
+  assert.equal(ui.writes.length, 1, "one complete snapshot is written at a time");
+  acknowledge({ ok: true });
+  await flush();
+  assert.equal(ui.button("section.save").props.disabled, false);
+  assert.equal(ui.toggle("section.emojiRain.label").props.checked, true);
+});
+
 test("failed settings writes remove stale success and retain the failure message", async (t) => {
   let result = { ok: true };
   const ui = await page(t, { update: async () => result });
@@ -194,7 +214,7 @@ test("clear-all uses distinct localized success copy, including an empty store",
       const clean = ui.requests.filter((r) => r.url === "/api/emote-chat/clean");
       assert.equal(clean.length, 1);
       assert.equal(clean[0].options.method, "POST");
-      assert.deepEqual(JSON.parse(clean[0].options.body), { mode: "all" });
+      assert.deepEqual(JSON.parse(clean[0].options.body), {});
       assert.equal(ui.toast().props.text, locale["section.store.cleared"]);
       assert.notEqual(ui.toast().props.text, locale["section.saved"]);
       assert.equal(ui.toast().props.tone, "success");
@@ -213,7 +233,7 @@ test("saved folders and catalog come from the completed config GET before succes
   ui.button("section.save").props.onClick();
   await flush();
   assert.deepEqual(ui.writes[0].paths, ["./cats"]);
-  assert.deepEqual(ui.requests.map((r) => [r.url, r.options.method ?? "GET"]), [
+  assert.deepEqual(ui.requests.filter((r) => !r.url.includes("/reactions?")).map((r) => [r.url, r.options.method ?? "GET"]), [
     ["/api/emote-chat/config", "GET"],
     ["/api/emote-chat/settings", "POST"],
     ["/api/emote-chat/config", "GET"],
@@ -276,6 +296,7 @@ test("a failed config refresh retains the last snapshot and reports an error unt
   await flush();
   assert.equal(ui.writes[0].emojiRain, true);
   assert.equal(ui.runtime.configStore.get().status, "error");
+  assert.equal(ui.toast(), undefined, "a failed refresh must not report success");
   assert.equal(ui.toggle("section.emojiRain.label").props.checked, false);
   assert.ok(ui.render().some((node) => node.props.role === "alert"
     && node.props.children?.[0].includes("catalog unavailable")));
@@ -283,6 +304,44 @@ test("a failed config refresh retains the last snapshot and reports an error unt
   assert.equal(ui.runtime.configStore.get().status, "ready");
   assert.equal(ui.toggle("section.emojiRain.label").props.checked, true);
   assert.ok(!ui.render().some((node) => node.props.role === "alert"));
+});
+
+test("saving waits out an older config request and starts a fresh read after the POST", async (t) => {
+  let oldResponse;
+  const ui = await page(t, { configFetch: (data, count) => count === 2
+    ? new Promise((resolve) => { oldResponse = resolve; })
+    : { ok: true, json: async () => JSON.parse(JSON.stringify(data)) },
+  });
+  const oldRead = ui.runtime.configFace.load();
+  ui.toggle("section.emojiRain.label").props.onToggle(true);
+  await flush();
+  assert.equal(ui.writes.length, 1);
+  assert.equal(ui.reads(), 2, "wait for the in-flight read instead of accepting its stale snapshot");
+  assert.equal(ui.toast(), undefined);
+  oldResponse({ ok: true, json: async () => ({
+    stickerReply: true, emojiReply: true, emojiRain: false, paths: ["stickers"], packs: [], errors: [],
+  }) });
+  await oldRead;
+  await flush();
+  assert.equal(ui.reads(), 3, "the save starts its own read after the old request settles");
+  assert.equal(ui.toggle("section.emojiRain.label").props.checked, true);
+  assert.equal(ui.toast().props.text, zh["section.saved"]);
+});
+
+test("a failed refresh keeps the edited paths available for retry", async (t) => {
+  const ui = await page(t, { configFetch: (data, count) => count === 2
+    ? { ok: false, json: async () => ({ message: "unavailable" }) }
+    : { ok: true, json: async () => JSON.parse(JSON.stringify(data)) },
+  });
+  ui.render().find((node) => node.type === "input").props.onChange({ target: { value: "new-folder" } });
+  ui.button("section.save").props.onClick();
+  await flush();
+  assert.equal(ui.toast(), undefined);
+  assert.equal(ui.render().find((node) => node.type === "input").props.value, "new-folder");
+  ui.button("section.save").props.onClick();
+  await flush();
+  assert.deepEqual(ui.writes[1].paths, ["new-folder"]);
+  assert.equal(ui.toast().props.text, zh["section.saved"]);
 });
 
 test("failed clear-all shows its error; a successful retry clears the error", async (t) => {
