@@ -1,12 +1,12 @@
 /**
  * [INPUT]: node:test、系统原生路径、临时文件系统与 Host 业务模块
- * [OUTPUT]: 跨平台路径归一化与素材扫描边界测试
+ * [OUTPUT]: 跨平台路径归一化、开关读取与素材扫描边界测试
  * [POS]: Host 单元测试；不读取真实用户配置
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -59,7 +59,7 @@ test("toPathList accepts a line-separated string", () => {
   assert.deepEqual(toPathList(`${x}\r\n${y}`), [x, y]);
 });
 
-test("readConfig normalizes booleans, paths and emoji", () => {
+test("readConfig normalizes booleans, paths and feature flags", () => {
   const packs = join(tmpdir(), "emote-chat-packs");
   const settings = readConfig({
     stickerReply: true,
@@ -233,38 +233,3 @@ test("buildCatalog returns an empty catalog without configured paths", async () 
   assert.deepEqual(catalog.errors, []);
   assert.equal(catalog.scannedAt > 0, true);
 });
-
-/** A profile patch shaped like the real one: comments, rows with config, no emote-chat row. */
-const PATCH_WITHOUT_ROW = `# Your patch layer for this dsh profile, applied after every bundle layer:
-# a top-level YAML array of loader patch entries.
-- id: locale
-  name: "@deepseek-ai/dsh-client-locale"
-  config:
-    preference: zh
-- id: ui-settings
-  name: "@deepseek-ai/dsh-client-ui-settings"
-  config:
-    enabled: true
-- insert:
-    - id: emote-chat
-      name: dsh-plugin-emote-chat
-      config:
-        stickerReply: false
-        paths: []
-- id: ui-chat
-  name: "@deepseek-ai/dsh-client-ui-chat"
-  config:
-    transcriptView: standard
-`;
-
-/** A profile patch where the plugin manager already opened a row for this plugin. */
-const PATCH_WITH_ROW = `# Your patch layer for this dsh profile.
-- id: locale
-  name: "@deepseek-ai/dsh-client-locale"
-  config:
-    preference: zh
-- id: emote-chat
-  disabled: false
-- id: ui-chat
-  name: "@deepseek-ai/dsh-client-ui-chat"
-`;

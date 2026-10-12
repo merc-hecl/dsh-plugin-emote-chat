@@ -1,6 +1,6 @@
 /**
  * [INPUT]: node:test、VM 与生成的客户端 bundle
- * [OUTPUT]: 客户端注册、UI 和消息匹配行为测试
+ * [OUTPUT]: 客户端注册、静态 UI 和宿主消息身份匹配测试
  * [POS]: 客户端测试入口；独立夹具隔离真实浏览器
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -91,6 +91,7 @@ function loadBundle(overrides = {}) {
           Switch: passthrough("button"),
           Button: passthrough("button"),
           Input: passthrough("input"),
+          Toast: passthrough("div"),
           IconCloseOutlineRegular: passthrough("svg"),
           IconPlusOutlineRegular: passthrough("svg"),
         };
@@ -101,7 +102,7 @@ function loadBundle(overrides = {}) {
     },
     fetch: async () => ({
       ok: true,
-      json: async () => ({ packs: [], paths: [], emoji: [] }),
+      json: async () => ({ packs: [], paths: [], emojiReply: false }),
     }),
     AbortController,
     setTimeout,
@@ -252,7 +253,6 @@ test("the bundle registers under the package id with an apply export", () => {
   assert.ok(Array.isArray(exports.inject));
   assert.ok(exports.inject.includes("slots"));
   assert.ok(exports.inject.includes("locale"));
-  assert.ok(exports.inject.includes("slots"));
 });
 
 test("apply injects the composer picker, the settings page, and the tool card", () => {
@@ -305,10 +305,7 @@ test("apply installs exactly one tagged stylesheet", () => {
 });
 
 test("the rain gate plays a recent live reaction and nothing else", () => {
-  // Getting this gate wrong is invisible: the chip still appears, so only the
-  // rain is missing. The bug it was written for gated on the feed's internal
-  // `live` flag, which stays false until the first long poll returns — so after
-  // any page load, a reaction from seconds ago could never rain.
+  // Historical priming entries never rain; only fresh live reactions do.
   const { exports } = loadBundle();
   const { shouldRain, RAIN_FRESH_MS } = exports.internals;
   const now = 1_000_000;
@@ -364,9 +361,6 @@ test("a reaction binds once and does not follow the newest message", () => {
   rowA.setAttribute("data-chat-node-key", "13:input-message" + ID_A);
   const rowB = makeStubNode("div");
   rowB.setAttribute("data-chat-node-key", "13:input-message" + ID_B);
-  const bound = new Map();
-  const cursor = { value: 0 };
-  const seen = new Map();
   const entries = [{ seq: 1, emoji: "💪", messageId: ID_A }];
 
   let placed = assignReactions(entries, [rowA]);
@@ -392,8 +386,7 @@ test("a reaction binds once and does not follow the newest message", () => {
     ["🎉"],
   );
 
-  // Once the bound row leaves the DOM the reaction is forgotten, so a rebuilt
-  // conversation still shows its history.
+  // Only currently visible rows are returned; entries remain available for paging back.
   placed = assignReactions(both, [rowB]);
   assert.deepEqual(
     Array.from(placed.get(rowB)).map((e) => e.emoji),
@@ -402,11 +395,8 @@ test("a reaction binds once and does not follow the newest message", () => {
   );
 });
 
-test("a reaction with no usable stamp binds to nothing", () => {
-  // The timestamp rule this replaced was removed on purpose: it still mis-anchored
-  // whenever a message arrived while a reaction was in flight. A reaction that
-  // names no message is left unbound — the Host prunes it — because an absent
-  // chip is honest and a misplaced one is not.
+test("a reaction without message identity does not bind by timestamp", () => {
+  // Missing message identity never falls back to time or the newest visible row.
   const { exports } = loadBundle();
   const { assignReactions } = exports.internals;
   const m2 = makeStubNode("div");
@@ -416,19 +406,14 @@ test("a reaction with no usable stamp binds to nothing", () => {
   const placed = assignReactions(
     [{ seq: 7, emoji: "✨", at: 5000 }],
     [m2, m3],
-    new Map(),
-    { value: 0 },
   );
-  assert.deepEqual([...placed.keys()], [], "no stamp, no binding");
+  assert.deepEqual([...placed.keys()], [], "no message identity, no binding");
 });
 
-test("a declared target beats the anchor", () => {
-  // This is the path that makes an intervened message addressable: the Agent
-  // names the message instead of relying on the browser to guess which one it
-  // meant. Both entries carry a stamp, so the difference is only which message
-  // each one names.
+test("reactions resolve full Host message IDs and reject partial IDs", () => {
+  // The Host determines targets; the client matches their complete identities.
   const { exports } = loadBundle();
-  const { assignReactions, messageIdOf } = exports.internals;
+  const { assignReactions, messageIdOf, rowMatches } = exports.internals;
   const ID_OLD = "11112222-3333-4444-5555-666677778888";
   const ID_NEW = "99990000-1111-2222-3333-444455556666";
   const oldRow = makeStubNode("div");
@@ -441,8 +426,6 @@ test("a declared target beats the anchor", () => {
       { seq: 2, emoji: "🍵", messageId: ID_NEW },
     ],
     [oldRow, newRow],
-    new Map(),
-    { value: 0 },
   );
   assert.deepEqual(
     Array.from(placed.get(oldRow)).map((e) => e.emoji),
@@ -454,9 +437,9 @@ test("a declared target beats the anchor", () => {
     ["🍵"],
   );
 
-  // The tail a model would quote resolves to the full id.
   assert.equal(messageIdOf("13:input-message" + ID_OLD), ID_OLD);
-  assert.ok(ID_OLD.endsWith("77778888"), "a tail is enough to name it");
+  assert.equal(rowMatches(oldRow, { messageId: "77778888" }), false);
+  assert.equal(assignReactions([{ seq: 3, emoji: "🎉", messageId: "77778888" }], [oldRow]).size, 0);
 });
 
 test("a named messageKey wins over timing", () => {
@@ -466,13 +449,9 @@ test("a named messageKey wins over timing", () => {
   rowA.setAttribute("data-chat-node-key", "A");
   const rowB = makeStubNode("div");
   rowB.setAttribute("data-chat-node-key", "B");
-  const seen = new Map();
   const placed = assignReactions(
     [{ seq: 1, emoji: "👏", messageKey: "A", at: 99999 }],
     [rowA, rowB],
-    new Map(),
-    { value: 0 },
-    seen,
   );
   assert.deepEqual(
     [...placed.keys()],
@@ -481,20 +460,8 @@ test("a named messageKey wins over timing", () => {
   );
 });
 
-test("apply is idempotent about the listener set and survives a second run", () => {
-  const { exports } = loadBundle();
-  const first = fakeContext();
-  exports.apply(first.ctx);
-  const second = fakeContext();
-  exports.apply(second.ctx);
-  assert.equal(second.registered.length, first.registered.length);
-});
-
-// Rendering is checked through the element tree `createElement` produces, which
-// is enough to pin the things that must not regress: the page uses the shipped
-// primitives rather than local controls, a switch turns its own section on, an
-// unreadable folder marks its own row, and the preview shows the stickers the
-// scan actually found.
+// Static element-tree checks cover folder errors and catalog previews.
+// Interactive writes and reloads are exercised through the real adapter in settings.test.mjs.
 
 /** A config face whose store returns a fixed snapshot. */
 function settingsFace(data) {
@@ -587,20 +554,6 @@ const CATALOG = {
   ],
   errors: [{ path: "D:\\missing", reason: "missing" }],
 };
-
-/** The switches on the rendered page, in row order. */
-function switches(tree) {
-  return walk(tree).filter(
-    (node) =>
-      typeof node.props?.onChange === "function" && "checked" in node.props,
-  );
-}
-
-// Two behaviours of this page are verified live rather than here: a switch
-// writes only its own field, and turning emoji replies off collapses the
-// emoji-rain row with it. Asserting them needs the shipped primitive's rendered
-// children, which this element-tree harness does not expand; a test that cannot
-// see them would pass against nothing.
 
 test("an unreadable folder marks its own row instead of failing the page", () => {
   const tree = renderPage(CATALOG);

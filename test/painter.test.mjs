@@ -1,7 +1,7 @@
 /**
  * [INPUT]: node:test、生成 bundle 与 dom-fixture
  * [OUTPUT]: 可逆贴纸投影的 DOM 回归
- * [POS]: 贴纸展示验证；用共享 DOM 夹具覆盖重渲染和原文还原
+ * [POS]: 贴纸展示验证；用共享 DOM fixture覆盖重渲染和原文还原
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { test } from "node:test";
@@ -13,8 +13,6 @@ import {
   chatDocument,
   visibleText,
   stickerFigures,
-  chipRows,
-  hiddenCarriers,
   allElements,
 } from "./dom-fixture.mjs";
 

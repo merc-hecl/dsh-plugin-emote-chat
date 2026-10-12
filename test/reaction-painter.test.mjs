@@ -1,7 +1,7 @@
 /**
  * [INPUT]: node:test、生成 bundle 与 dom-fixture
  * [OUTPUT]: 消息回应胶囊与 emoji 雨的 DOM 回归
- * [POS]: 回应展示验证；用共享 DOM 夹具覆盖身份、重启和释放
+ * [POS]: 回应展示验证；用共享 DOM fixture覆盖身份、重启和释放
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { test } from "node:test";
@@ -11,11 +11,7 @@ import {
   makeElement,
   makeText,
   chatDocument,
-  visibleText,
-  stickerFigures,
   chipRows,
-  hiddenCarriers,
-  allElements,
 } from "./dom-fixture.mjs";
 
 test("the reaction painter puts chips inside the user bubble", () => {

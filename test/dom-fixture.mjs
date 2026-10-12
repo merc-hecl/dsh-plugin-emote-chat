@@ -1,7 +1,7 @@
 /**
  * [INPUT]: Node VM/fs、可覆盖的 React/宿主原语和生成的客户端 bundle
  * [OUTPUT]: loadBundle、DOM 树和文本检查工具
- * [POS]: 测试共享夹具；模拟 ModuleLoader 与 React，不提供业务实现
+ * [POS]: 测试共享fixture；模拟 ModuleLoader 与 React，不提供业务实现
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { readFileSync } from "node:fs";
@@ -45,6 +45,7 @@ function loadBundle({ react = {}, primitives = {}, ...overrides } = {}) {
           Switch: passthrough("button"),
           Button: passthrough("button"),
           Input: passthrough("input"),
+          Toast: passthrough("div"),
           IconCloseOutlineRegular: passthrough("svg"),
           IconPlusOutlineRegular: passthrough("svg"),
           ...primitives,
@@ -79,6 +80,26 @@ function loadBundle({ react = {}, primitives = {}, ...overrides } = {}) {
 }
 
 // ───────────────────────────── a very small DOM ──────────────────────────────
+
+/** Match the tag, class and attribute selectors used by the actual painters. */
+function matchesSelector(node, selector) {
+  if (node.nodeType !== 1) return false;
+  return selector.split(",").some((part) => {
+    const simple = part.trim();
+    if (simple.startsWith(".")) return node.classList.contains(simple.slice(1));
+    const match = /^([a-z][\w-]*)?(?:\[([\w-]+)(?:(\*=|\^=|=)["']([^"']*)["'])?\])?$/iu.exec(simple);
+    if (!match || (!match[1] && !match[2])) return false;
+    const [, tag, attr, operator, expected] = match;
+    if (tag && node.tagName !== tag.toUpperCase()) return false;
+    if (!attr) return true;
+    const value = attr === "class" ? node.className : node.getAttribute(attr);
+    if (value === null) return false;
+    if (!operator) return attr === "class" || node.hasAttribute(attr);
+    if (operator === "*=") return value.includes(expected);
+    if (operator === "^=") return value.startsWith(expected);
+    return value === expected;
+  });
+}
 
 /** Create a stub element. */
 function makeElement(tag) {
@@ -221,98 +242,19 @@ function makeElement(tag) {
         element.childNodes.find((child) => child.tagName !== undefined) ?? null
       );
     },
-    querySelector() {
-      return null;
+    querySelector(selector) {
+      return element.querySelectorAll(selector)[0] ?? null;
     },
     querySelectorAll(selector) {
-      // Real traversal for the one selector this code looks up: descendants by
-      // tag name. Answering everything with an empty list silently disabled
-      // findClassFragment, so a host lookup that should have found the bubble
-      // always took its fallback branch instead.
-      const tag = String(selector).toUpperCase();
-      return allElements(element).filter(
-        (node) => typeof node.tagName === "string" && node.tagName === tag,
-      );
+      return allElements(element).filter((node) => matchesSelector(node, selector));
     },
     closest(selector) {
-      // The painter's lookups, in the selectors it actually uses. Anything else
-      // must miss, like a real DOM with no matching ancestor.
-      if (selector === "p") {
-        let node = element;
-        while (node !== null && node !== undefined) {
-          if (node.tagName === "P") return node;
-          node = node.__parent ?? null;
-        }
-        return null;
-      }
-      const attributeOf = (node) => {
-        if (selector === "pre, code")
-          return node.tagName === "PRE" || node.tagName === "CODE"
-            ? node
-            : undefined;
-        if (selector === "[data-chat-flow-kind]")
-          return node.hasAttribute?.("data-chat-flow-kind") ? node : undefined;
-        if (selector === "[data-emote-sticker]")
-          return node.hasAttribute?.("data-emote-sticker") ? node : undefined;
-        if (selector === "[data-emote-chips]")
-          return node.hasAttribute?.("data-emote-chips") ? node : undefined;
-        if (selector === 'div[class*="_userStack"]') {
-          return typeof node.className === "string" &&
-            node.className.includes("_userStack")
-            ? node
-            : undefined;
-        }
-        // The non-message region list, plus the tool-card anchor prefix.
-        if (selector.includes("data-step-process")) {
-          for (const name of [
-            "data-step-process",
-            "data-step-process-body",
-            "data-step-process-content",
-          ]) {
-            if (node.hasAttribute?.(name)) return node;
-          }
-          return undefined;
-        }
-        if (selector.includes("data-chat-anchor-key")) {
-          const anchor = node.getAttribute?.("data-chat-anchor-key");
-          return typeof anchor === "string" && anchor.startsWith("call:")
-            ? node
-            : undefined;
-        }
-        return undefined;
-      };
       let node = element;
       while (node !== null) {
-        const hit = attributeOf(node);
-        if (hit !== undefined) return hit;
+        if (matchesSelector(node, selector)) return node;
         node = node.parentElement;
       }
       return null;
-    },
-    querySelector(selector) {
-      // The stub keeps an explicit child tree; a descendant sweep covers every
-      // selector the painters use.
-      for (const child of allElements(element)) {
-        if (selector === "div") {
-          if (child.tagName === "DIV") return child;
-          continue;
-        }
-        if (
-          selector === "[data-emote-sticker]" &&
-          child.hasAttribute?.("data-emote-sticker")
-        )
-          return child;
-        if (
-          selector === "[data-emote-chips]" &&
-          child.hasAttribute?.("data-emote-chips")
-        )
-          return child;
-      }
-      return null;
-    },
-    querySelectorAll(selector) {
-      if (selector !== "div") return [];
-      return allElements(element).filter((child) => child.tagName === "DIV");
     },
   };
   element.ownerDocument = null;
@@ -350,9 +292,6 @@ function chatDocument(roots) {
         return roots.filter(
           (root) => root.getAttribute("data-chat-flow-kind") === "user",
         );
-      }
-      if (selector === ".ec-hidden-token") {
-        return roots.flatMap((root) => hiddenCarriers(root));
       }
       if (selector === "[data-emote-hidden]")
         return roots.flatMap((root) =>
@@ -436,13 +375,6 @@ function chipRows(root) {
   );
 }
 
-/** Descendants of one node wrapped as a hidden token carrier. */
-function hiddenCarriers(root) {
-  return allElements(root).filter((node) =>
-    node.classList?.contains("ec-hidden-token"),
-  );
-}
-
 // ─────────────────────────────────── tests ───────────────────────────────────
 
 export {
@@ -453,6 +385,5 @@ export {
   visibleText,
   stickerFigures,
   chipRows,
-  hiddenCarriers,
   allElements,
 };
