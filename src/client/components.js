@@ -1,6 +1,6 @@
 /**
  * [INPUT]: React、宿主 UI primitives 与 shared 的配置和素材工具
- * [OUTPUT]: StickerPicker、SettingsSection
+ * [OUTPUT]: StickerPicker、SettingsSection；保存、扫描和清空成功复用宿主 Toast
  * [POS]: 交互组件层；选择器只改草稿，设置通过 runtime 的写入适配器保存
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -281,6 +281,13 @@ function SettingsSection({ t, config, context }) {
 
   const [busy, setBusy] = React.useState(false);
   const [maintenance, setMaintenance] = React.useState(null);
+  const [toast, setToast] = React.useState(null);
+  const toastSequence = React.useRef(0);
+
+  const showSuccess = (text) => {
+    toastSequence.current += 1;
+    setToast({ id: toastSequence.current, text });
+  };
 
   // 诊断只记录实际挂载，重复渲染不增加计数。
   React.useEffect(() => {
@@ -306,7 +313,8 @@ function SettingsSection({ t, config, context }) {
   // 空路径列表显示一个输入行；保存时过滤空行。
   const lines = linesDraft ?? (saved.length === 0 ? [""] : saved);
 
-  const commit = async (next) => {
+  const commit = async (next, successKey = "section.saved") => {
+    setToast(null);
     const result = await context.update({
       stickerReply: next.stickerReply,
       paths: splitLines((next.lines ?? []).join("\n")),
@@ -321,18 +329,18 @@ function SettingsSection({ t, config, context }) {
     setAlert(null);
     setLinesDraft(null);
     await config.load();
+    showSuccess(t(successKey));
     return true;
   };
 
   const clearAll = async () => {
     if (busy) return;
     setBusy(true);
+    setToast(null);
     try {
-      const payload = await postJson(API + "/clean", { mode: "all" });
-      setMaintenance({
-        tone: "info",
-        text: t("section.store.cleared", { removed: payload.removed }),
-      });
+      await postJson(API + "/clean", { mode: "all" });
+      setMaintenance(null);
+      showSuccess(t("section.store.cleared"));
     } catch (error) {
       setMaintenance({
         tone: "error",
@@ -467,7 +475,10 @@ function SettingsSection({ t, config, context }) {
         h(
           Button,
           // 重写当前值使 Host 索引失效，再读取扫描结果。
-          { onClick: () => void commit({ ...settings, lines }) },
+          {
+            onClick: () =>
+              void commit({ ...settings, lines }, "section.scanCompleted"),
+          },
           t("section.scan"),
         ),
         h(
@@ -485,6 +496,15 @@ function SettingsSection({ t, config, context }) {
   return h(
     "div",
     { className: "ec-page", "data-emote-settings": "" },
+    toast === null
+      ? null
+      : h(primitives.Toast, {
+          key: toast.id,
+          text: toast.text,
+          tone: "success",
+          onDone: () =>
+            setToast((current) => (current?.id === toast.id ? null : current)),
+        }),
     snapshot.status === "error"
       ? h(
           "p",

@@ -1,5 +1,5 @@
 /**
- * [INPUT]: Node VM/fs 与生成的客户端 bundle
+ * [INPUT]: Node VM/fs、可覆盖的 React/宿主原语和生成的客户端 bundle
  * [OUTPUT]: loadBundle、DOM 树和文本检查工具
  * [POS]: 测试共享夹具；模拟 ModuleLoader 与 React，不提供业务实现
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
@@ -13,7 +13,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const bundlePath = join(here, "..", "lib", "client.js");
 
 /** Load the browser bundle in a VM and return its exports. */
-function loadBundle() {
+function loadBundle({ react = {}, primitives = {}, ...overrides } = {}) {
   let registration;
   const sandbox = {
     window: { __ModuleLoader__: { load: (def) => (registration = def) } },
@@ -33,6 +33,7 @@ function loadBundle() {
           useEffect: () => {},
           useRef: () => ({ current: null }),
           useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot(),
+          ...react,
         };
       }
       if (spec === "@deepseek-ai/dsh-client-ui-primitives") {
@@ -46,6 +47,7 @@ function loadBundle() {
           Input: passthrough("input"),
           IconCloseOutlineRegular: passthrough("svg"),
           IconPlusOutlineRegular: passthrough("svg"),
+          ...primitives,
         };
       }
       if (spec === "react/jsx-runtime")
@@ -65,6 +67,7 @@ function loadBundle() {
     },
     NodeFilter: { SHOW_TEXT: 4 },
     console,
+    ...overrides,
   };
   sandbox.AbortController = AbortController;
   sandbox.globalThis = sandbox;
