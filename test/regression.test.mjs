@@ -1,7 +1,7 @@
 /**
- * [INPUT]: node:test、受限宿主 Context 与 Host/config/catalog/reaction 模块
- * [OUTPUT]: 单包生命周期、Desktop 配置条目契约、存储和消息身份回归测试
- * [POS]: 宿主适配回归；使用临时目录，禁止读取真实用户存储
+ * [INPUT]: node:test、受限宿主 Context、投影 registry fixture 与 Host 业务模块
+ * [OUTPUT]: 单包生命周期、配置条目契约、回合目标投影与持久化回归测试
+ * [POS]: 宿主适配回归；覆盖投影缺失和释放，使用临时目录隔离真实用户存储
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { test } from "node:test";
@@ -15,13 +15,14 @@ import {
   createReactionStore,
   assertReactionEmoji,
   reactionTarget,
+  reactionTargetProjection,
 } from "../lib/reactions.js";
 
 function agent(extra = []) {
   return {
     id: "session",
     session: {
-      snapshotEvents: () => [
+      events: [
         { type: "turn/start", seq: 1, data: { turn: 1 } },
         { type: "step/start", seq: 2 },
         {
@@ -31,6 +32,21 @@ function agent(extra = []) {
         },
         ...extra,
       ],
+    },
+  };
+}
+function projectionRegistry() {
+  const definitions = new Map();
+  return {
+    register(definition) {
+      definitions.set(definition.key, definition);
+      return () => definitions.delete(definition.key);
+    },
+    stateOf(session, key) {
+      const definition = definitions.get(key);
+      return definition
+        ? session.events.reduce(definition.apply, definition.init())
+        : undefined;
     },
   };
 }
@@ -65,6 +81,7 @@ async function mount(t, initial = {}, options = {}) {
     return result;
   };
   const services = {
+    sessionProjections: projectionRegistry(),
     tools: {
       register(def) {
         tools.set(def.name, def);
@@ -141,6 +158,7 @@ async function mount(t, initial = {}, options = {}) {
     tools,
     sections,
     service,
+    projections: services.sessionProjections,
     request,
     dispose,
     writes: () => writes,
@@ -247,17 +265,19 @@ test("tool binds full emoji to first-step message, not steering", async (t) => {
   assert.deepEqual(saved.rows, [["message", 1, "👨‍👩‍👧‍👦"]]);
 });
 test("identity refuses absent, finished and non-human turns", () => {
-  assert.throws(() => reactionTarget({}), /session event/);
-  assert.throws(() => reactionTarget(agent([{ type: "turn/end" }])), /ended/);
+  const projections = projectionRegistry();
+  projections.register(reactionTargetProjection);
+  assert.throws(() => reactionTarget({}, projections), /owning session/);
+  assert.throws(() => reactionTarget(agent([{ type: "turn/end" }]), projections), /ended/);
   assert.throws(
-    () => reactionTarget(agent([{ type: "step/start" }, { type: "turn/end" }])),
+    () => reactionTarget(agent([{ type: "step/start" }, { type: "turn/end" }]), projections),
     /ended/,
   );
   assert.throws(
     () =>
       reactionTarget({
         session: {
-          snapshotEvents: () => [
+          events: [
             { type: "turn/start" },
             {
               type: "user/message",
@@ -265,9 +285,65 @@ test("identity refuses absent, finished and non-human turns", () => {
             },
           ],
         },
-      }),
+      }, projections),
     /human/,
   );
+  assert.throws(() => reactionTarget({ session: { events: [] } }, projections), /no active turn/);
+});
+
+test("reaction target projection resets between turns and ignores later-step input", () => {
+  const projections = projectionRegistry();
+  projections.register(reactionTargetProjection);
+  const current = agent();
+  current.session.snapshotEvents = () => { throw new Error("deprecated read"); };
+  current.session.events.push(
+    { type: "user/message", data: { id: "last-first-step", source: { kind: "user" } } },
+    { type: "step/start" },
+    { type: "user/message", data: { id: "steering", source: { kind: "user" } } },
+  );
+  assert.deepEqual(reactionTarget(current, projections), { messageId: "last-first-step" });
+  current.session.events.push({ type: "turn/end" }, { type: "turn/start" });
+  assert.throws(() => reactionTarget(current, projections), /human/);
+  current.session.events.push(
+    { type: "step/start" },
+    { type: "user/message", data: { id: "next-turn", source: { kind: "user" } } },
+  );
+  assert.deepEqual(reactionTarget(current, projections), { messageId: "next-turn" });
+});
+
+test("reaction target projection stays host-only and checkpoints valid bounded state", () => {
+  assert.equal(reactionTargetProjection.wire, undefined);
+  let state = reactionTargetProjection.init();
+  assert.equal(reactionTargetProjection.apply(state, { type: "user/message" }), state);
+  for (const event of agent().session.events) state = reactionTargetProjection.apply(state, event);
+  for (let step = 0; step < 100; step++)
+    state = reactionTargetProjection.apply(state, { type: "step/start" });
+  assert.equal(state.steps, 2);
+  assert.equal(reactionTargetProjection.apply(state, { type: "assistant/message" }), state);
+  assert.deepEqual(reactionTargetProjection.stateSchema.parse(state), state);
+  for (const invalid of [
+    { ...state, status: "unknown" },
+    { ...state, steps: -1 },
+    { ...state, steps: 3 },
+    { ...state, messageId: null },
+  ])
+    assert.throws(() => reactionTargetProjection.stateSchema.parse(invalid));
+});
+
+test("missing projections reject emoji without breaking sticker discovery or UI routes", async (t) => {
+  const app = await mount(t, { stickerReply: true }, { missing: "sessionProjections" });
+  await assert.rejects(app.tools.get("emote_reply").execute({ emoji: "🎉" }, { agent: agent() }), /projection unavailable/);
+  assert.deepEqual((await (await app.request("reactions")).json()).reactions, []);
+  assert.equal((await app.tools.get("list_stickers").execute({})).ok, true);
+  assert.equal((await app.request("config")).status, 200);
+});
+
+test("unload removes the reaction target projection", async (t) => {
+  const app = await mount(t);
+  const current = agent();
+  assert.deepEqual(reactionTarget(current, app.projections), { messageId: "message" });
+  app.dispose();
+  assert.throws(() => reactionTarget(current, app.projections), /projection unavailable/);
 });
 test("emoji validation preserves flags, keycaps, ZWJ and rejects multiple clusters", () => {
   for (const emoji of ["🇨🇳", "1️⃣", "👍🏽", "👩‍💻", "👨‍👩‍👧‍👦"])
@@ -300,7 +376,7 @@ test("store bounds, restores without duplication, and creates directory on teard
   const dir = await scratch(t),
     file = join(dir, "new", "reactions.json");
   const store = createReactionStore({ file });
-  for (let n = 0; n < 505; n++) store.add(agent(), "🎉");
+  for (let n = 0; n < 505; n++) store.add("message", "🎉");
   store.dispose();
   const restored = createReactionStore({ file });
   t.after(() => restored.dispose());

@@ -13,7 +13,7 @@ runtime-fixture.mjs: 客户端集成 fixture；模拟 HTTP、计时器、observe
 runtime.test.mjs: 真实 apply 的卸载与重载回归；验证资源释放、订阅与在途请求取消
 feed.test.mjs: 受控网络和计时器回归；覆盖当前快照、旧协议拒绝、退避、重启与取消
 auth.test.mjs: 共享诊断认证协议回归；覆盖 grant 隔离、Cookie 签名、authority 与有效期
-regression.test.mjs: Host 组装契约及存储回归；独立临时目录隔离真实配置
+regression.test.mjs: Host 组装、回合目标投影及存储回归；覆盖恢复、目标锁定和投影缺失/卸载，独立临时目录隔离真实配置
 discovery.test.mjs: 模型素材发现契约；覆盖两级查询、分页边界、刷新、开关及可见输出
 
 [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
