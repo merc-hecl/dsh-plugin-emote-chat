@@ -7,12 +7,13 @@ src/ - 浏览器源码；见 src/AGENTS.md
 scripts/ - 构建与宿主诊断；见 scripts/AGENTS.md
 test/ - 单元、DOM、订阅与宿主契约测试；见 test/AGENTS.md
 .github/ - 标签触发的自动 Release 与 npm 同步发布；见 .github/AGENTS.md
+docs/ - README 实机效果截图；见 docs/AGENTS.md
 .agents/ - 本地项目技能，不发布
 .scratch/ - 本地诊断产物，不发布
 </directory>
 
 <config>
-package.json - 唯一发布包；Host/Client 入口、构建、静态检查及测试命令
+package.json - 唯一发布包；Host/Client 入口、文档及截图打包清单、构建、静态检查及测试命令
 package-lock.json - npm 构建与开发依赖锁定
 cordis.patch.yml - 单 Host row，Client 由 package manifest 发现
 eslint.config.mjs - Host、Client、诊断脚本和测试的未定义标识符及未使用变量检查

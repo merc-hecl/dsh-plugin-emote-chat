@@ -8,7 +8,23 @@ description: "DeepSeek Harness 聊天的贴纸与 emoji 回应：输入框贴纸
 
 为 DeepSeek Harness 聊天（Web 与 Desktop）提供贴纸与 emoji 回应。
 
-使用当前 DSH 0.2.0-rc.2 的输入与消息 DOM 契约；不保留旧接口、旧类名或旧订阅协议的兼容路径。现有 v1 回应存储继续使用。
+已于 2026-10-29 在 Windows 上的 **DSH Desktop 0.2.1-rc.3** 验证，本次更新无需修改插件代码。使用当前输入框、消息 DOM 与会话投影契约，现有 v1 回应存储继续使用。
+
+## 效果预览
+
+以下截图来自 DSH Desktop 0.2.1-rc.3 提供的 Web 界面，使用真实演示会话和已配置的本地表情包。贴纸素材来自配置的素材包，插件本身不附带这些图片。
+
+**浏览表情包目录，将贴纸插入草稿。**
+
+![表情包选择器：左侧目录、右侧图片预览，以及插入草稿的贴纸标记](docs/images/sticker-picker.png)
+
+**你和 Agent 都能发送贴纸，emoji 回应留在你的消息气泡内。**
+
+![用户与 Agent 互发表情包，用户消息气泡内显示 emoji 回应](docs/images/sticker-conversation.png)
+
+**新回应触发 emoji 雨，飘落整个界面。** 下图定格于实际动画下落过程中的一帧。
+
+![庆祝 emoji 雨飘落在聊天界面上](docs/images/emoji-rain.png)
 
 ## 功能
 
@@ -43,7 +59,7 @@ description: "DeepSeek Harness 聊天的贴纸与 emoji 回应：输入框贴纸
 在 Desktop 的插件管理界面安装解压后包含 `package.json` 的 `package` 目录。
 如果尚无 Release，可以下载并解压 [源码压缩包](https://github.com/merc-hecl/dsh-plugin-emote-chat/archive/refs/heads/main.zip)，
 安装其根目录。两种方式均包含已构建的客户端。
-Desktop 0.2.0-rc.2 的专用 profile 由应用管理。
+Desktop 的专用 profile 由应用管理。
 
 ### Web
 

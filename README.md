@@ -8,7 +8,23 @@ English | [中文](README.zh.md)
 
 Stickers and emoji reactions for the DeepSeek Harness chat — Web and Desktop.
 
-Uses the current DSH 0.2.0-rc.2 composer and message DOM contracts, without compatibility paths for older interfaces, class names, or subscription protocols. Existing v1 reaction storage remains in use.
+Verified with **DSH Desktop 0.2.1-rc.3** on Windows on 2026-10-29: no plugin code changes were needed. Uses the current composer, message DOM and session projection contracts. Existing v1 reaction storage remains in use.
+
+## Preview
+
+Captured from the Web UI served by DSH Desktop 0.2.1-rc.3, using a real demo conversation and a configured local sticker pack. Sticker artwork comes from the configured pack; it is not bundled with the plugin.
+
+**Browse a pack and insert a sticker into your draft.**
+
+![Sticker picker with folder navigation, image previews and a sticker tag in the draft](docs/images/sticker-picker.png)
+
+**Exchange stickers with the Agent; emoji reactions stay inside your message bubble.**
+
+![User and Agent stickers with an emoji reaction attached to the user message](docs/images/sticker-conversation.png)
+
+**A fresh reaction triggers emoji rain across the window.** This screenshot freezes the actual animation midway through its fall.
+
+![Celebration emoji falling across the conversation](docs/images/emoji-rain.png)
 
 ## What it adds
 
@@ -47,7 +63,7 @@ Download the `.tgz` plugin package from [Releases](https://github.com/merc-hecl/
 extract it, then install the extracted `package` directory containing `package.json` through Desktop plugin management.
 If no release is available yet, download and extract the [source archive](https://github.com/merc-hecl/dsh-plugin-emote-chat/archive/refs/heads/main.zip)
 and install its root directory instead. Both include the prebuilt client.
-Desktop 0.2.0-rc.2 manages its own profile.
+Desktop manages its own profile.
 
 ### Web
 
