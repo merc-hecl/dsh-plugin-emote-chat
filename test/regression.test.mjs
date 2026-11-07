@@ -1,7 +1,7 @@
 /**
- * [INPUT]: node:test、受限宿主 Context、投影 registry fixture 与 Host 业务模块
+ * [INPUT]: node:test、受限宿主 Context、异步投影句柄 fixture 与 Host 业务模块
  * [OUTPUT]: 单包生命周期、配置条目契约、回合目标投影与持久化回归测试
- * [POS]: 宿主适配回归；覆盖投影缺失和释放，使用临时目录隔离真实用户存储
+ * [POS]: 宿主适配回归；覆盖投影等待、缺失和释放，使用临时目录隔离真实用户存储
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { test } from "node:test";
@@ -38,15 +38,14 @@ function agent(extra = []) {
 function projectionRegistry() {
   const definitions = new Map();
   return {
-    register(definition) {
+    get size() { return definitions.size; },
+    async register(definition) {
       definitions.set(definition.key, definition);
-      return () => definitions.delete(definition.key);
-    },
-    stateOf(session, key) {
-      const definition = definitions.get(key);
-      return definition
-        ? session.events.reduce(definition.apply, definition.init())
-        : undefined;
+      await Promise.resolve();
+      return {
+        stateOf: (session) => session.events.reduce(definition.apply, definition.init()),
+        dispose: async () => { definitions.delete(definition.key); },
+      };
     },
   };
 }
@@ -72,7 +71,8 @@ async function mount(t, initial = {}, options = {}) {
   const routes = new Map(),
     tools = new Map(),
     sections = [],
-    disposers = [];
+    disposers = [],
+    activations = [];
   let writes = 0;
   const namespace = options.namespace ?? "emote-chat";
   const effect = (cb) => {
@@ -111,7 +111,11 @@ async function mount(t, initial = {}, options = {}) {
       provide: (_name, value) => (service = value),
       inject(names, cb) {
         if (names.some((name) => options.missing === name)) return;
-        return cb({ ...services, effect });
+        const activation = Promise.resolve(cb({ ...services, effect })).then((dispose) => {
+          if (typeof dispose === "function") disposers.push(dispose);
+        });
+        activations.push(activation);
+        return activation;
       },
       connection: {
         fetch: {
@@ -132,11 +136,12 @@ async function mount(t, initial = {}, options = {}) {
     }),
     config,
   );
-  function dispose() {
-    for (const cb of disposers.splice(0).reverse()) cb();
+  await Promise.all(activations);
+  async function dispose() {
+    for (const cb of disposers.splice(0).reverse()) await cb();
   }
-  t.after(() => {
-    dispose();
+  t.after(async () => {
+    await dispose();
     if (old === undefined) delete process.env.DSH_EMOTE_STORAGE_DIR;
     else process.env.DSH_EMOTE_STORAGE_DIR = old;
   });
@@ -180,7 +185,7 @@ test("one package registers tool, routes, and truthful synchronous guidance", as
     "message",
   ]);
   assert.match(app.sections[0].text(), /through the `emote_reply` tool/);
-  app.dispose();
+  await app.dispose();
   assert.equal(app.tools.size, 0);
 });
 test("UI routes still activate without tools", async (t) => {
@@ -258,15 +263,14 @@ test("tool binds full emoji to first-step message, not steering", async (t) => {
   assert.equal(result.emoji, "👨‍👩‍👧‍👦");
   const payload = await (await app.request("reactions")).json();
   assert.equal(payload.reactions[0].messageId, "message");
-  app.dispose();
+  await app.dispose();
   const saved = JSON.parse(
     await readFile(join(app.dir, "emote-chat-reactions.json"), "utf8"),
   );
   assert.deepEqual(saved.rows, [["message", 1, "👨‍👩‍👧‍👦"]]);
 });
-test("identity refuses absent, finished and non-human turns", () => {
-  const projections = projectionRegistry();
-  projections.register(reactionTargetProjection);
+test("identity refuses absent, finished and non-human turns", async () => {
+  const projections = await projectionRegistry().register(reactionTargetProjection);
   assert.throws(() => reactionTarget({}, projections), /owning session/);
   assert.throws(() => reactionTarget(agent([{ type: "turn/end" }]), projections), /ended/);
   assert.throws(
@@ -291,9 +295,8 @@ test("identity refuses absent, finished and non-human turns", () => {
   assert.throws(() => reactionTarget({ session: { events: [] } }, projections), /no active turn/);
 });
 
-test("reaction target projection resets between turns and ignores later-step input", () => {
-  const projections = projectionRegistry();
-  projections.register(reactionTargetProjection);
+test("reaction target projection resets between turns and ignores later-step input", async () => {
+  const projections = await projectionRegistry().register(reactionTargetProjection);
   const current = agent();
   current.session.snapshotEvents = () => { throw new Error("deprecated read"); };
   current.session.events.push(
@@ -341,9 +344,11 @@ test("missing projections reject emoji without breaking sticker discovery or UI 
 test("unload removes the reaction target projection", async (t) => {
   const app = await mount(t);
   const current = agent();
-  assert.deepEqual(reactionTarget(current, app.projections), { messageId: "message" });
-  app.dispose();
-  assert.throws(() => reactionTarget(current, app.projections), /projection unavailable/);
+  assert.equal(app.projections.size, 1);
+  assert.equal(app.service.react(current, "✅").messageId, "message");
+  await app.dispose();
+  assert.equal(app.projections.size, 0);
+  assert.throws(() => app.service.react(current, "✅"), /projection unavailable/);
 });
 test("emoji validation preserves flags, keycaps, ZWJ and rejects multiple clusters", () => {
   for (const emoji of ["🇨🇳", "1️⃣", "👍🏽", "👩‍💻", "👨‍👩‍👧‍👦"])

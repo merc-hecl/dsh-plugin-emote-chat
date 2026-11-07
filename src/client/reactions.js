@@ -1,13 +1,14 @@
 /**
  * [INPUT]: shared 的显示上限和时效，dom 的消息容器查找
  * [OUTPUT]: createReactionPainter、消息匹配、rain、disposeRain 与诊断信息
- * [POS]: 按稳定 messageId 与当前 Desktop bubble 显示回应，不回退旧消息 key 或容器
+ * [POS]: 按稳定 messageId 与宿主语义气泡标记显示回应，兼容先前 CSS module 气泡
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { MESSAGE_ID_MARKER, MAX_CHIPS, RAIN_FRESH_MS } from "./shared.js";
 import { findClassFragment } from "./dom.js";
 function reactionHost(flow) {
-  return findClassFragment(flow, "bubble");
+  // Desktop 0.2.2-rc.1 uses the shared UserMessageBubble primitive.
+  return flow.querySelector("[data-message-bubble]") ?? findClassFragment(flow, "bubble");
 }
 
 function messageIdOf(key) {

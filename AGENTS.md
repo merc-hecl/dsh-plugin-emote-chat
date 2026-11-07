@@ -7,7 +7,7 @@ src/ - 浏览器源码；见 src/AGENTS.md
 scripts/ - 构建与宿主诊断；见 scripts/AGENTS.md
 test/ - 单元、DOM、订阅与宿主契约测试；见 test/AGENTS.md
 .github/ - 标签触发的自动 Release 与 npm 同步发布；见 .github/AGENTS.md
-docs/ - README 实机效果截图；见 docs/AGENTS.md
+docs/ - 宿主兼容性记录与 README 实机效果截图；见 docs/AGENTS.md
 .agents/ - 本地项目技能，不发布
 .scratch/ - 本地诊断产物，不发布
 </directory>

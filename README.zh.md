@@ -8,7 +8,7 @@ description: "DeepSeek Harness 聊天的贴纸与 emoji 回应：输入框贴纸
 
 为 DeepSeek Harness 聊天（Web 与 Desktop）提供贴纸与 emoji 回应。
 
-已于 2026-10-29 在 Windows 上的 **DSH Desktop 0.2.1-rc.3** 验证，本次更新无需修改插件代码。使用当前输入框、消息 DOM 与会话投影契约，现有 v1 回应存储继续使用。
+当前代码面向 **DSH Desktop 0.2.2-rc.1**，已于 2026-11-07 在 Windows 上验证。回应展示使用共享消息气泡标记，并等待新版宿主的会话投影句柄 API 就绪；现有 v1 回应存储继续使用。更新插件后需重启 DSH，才能载入 Host 修改。
 
 ## 效果预览
 

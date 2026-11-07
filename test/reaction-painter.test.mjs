@@ -1,7 +1,7 @@
 /**
  * [INPUT]: node:test、生成 bundle 与 dom-fixture
  * [OUTPUT]: 消息回应胶囊与 emoji 雨的 DOM 回归
- * [POS]: 回应展示验证；用共享 DOM fixture覆盖身份、重启和释放
+ * [POS]: 回应展示验证；覆盖新版语义气泡标记、身份、重启和释放
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 import { test } from "node:test";
@@ -72,29 +72,30 @@ test("the reaction painter puts chips inside the user bubble", () => {
 });
 
 
-test("reactionHost anchors on the bubble with the desktop build's class names", () => {
-  // The desktop bundle uses CSS-module hashes of the shape `cJsG2q_bubble`
-  // (prefix, no leading underscore), and its user row nests as
-  // `flow > userRow > userStack > bubble`. The first version matched
-  // `_bubble_` and dived by firstElementChild, so the chips landed in the row
-  // BESIDE the bubble — reported live as host "cJsG2q_userRow".
-  const { exports } = loadBundle();
+test("the reaction painter uses the shared message bubble marker in Desktop 0.2.2", () => {
+  const { exports, sandbox } = loadBundle();
   const flow = makeElement("div");
+  flow.setAttribute("data-chat-flow-kind", "user");
+  flow.setAttribute("data-chat-node-key", "1:input-messageabc");
   const row = makeElement("div");
   row.className = "cJsG2q_userRow";
   const stack = makeElement("div");
   stack.className = "cJsG2q_userStack";
   const bubble = makeElement("div");
-  bubble.className = "cJsG2q_bubble";
+  // UserContent now renders the shared UserMessageBubble primitive, whose
+  // class no longer ends in _bubble. The chat owns this semantic marker.
+  bubble.className = "shared_userMessage";
+  bubble.setAttribute("data-message-bubble", "");
   bubble.appendChild(makeText("hello"));
   stack.appendChild(bubble);
   row.appendChild(stack);
   flow.appendChild(row);
-  assert.equal(
-    exports.internals.reactionHost(flow),
-    bubble,
-    "the bubble holds the reaction row",
-  );
+  sandbox.document = chatDocument([flow]);
+  exports.internals.createReactionPainter({
+    getEntries: () => [{ seq: 1, emoji: "🎉", messageId: "abc" }],
+  }).scan();
+  assert.equal(chipRows(bubble).length, 1);
+  assert.equal(chipRows(bubble)[0].textContent, "🎉");
 });
 
 test("unsupported containers do not receive reaction chips", () => {

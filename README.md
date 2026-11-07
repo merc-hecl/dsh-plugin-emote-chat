@@ -8,7 +8,7 @@ English | [中文](README.zh.md)
 
 Stickers and emoji reactions for the DeepSeek Harness chat — Web and Desktop.
 
-Verified with **DSH Desktop 0.2.1-rc.3** on Windows on 2026-10-29: no plugin code changes were needed. Uses the current composer, message DOM and session projection contracts. Existing v1 reaction storage remains in use.
+This revision targets **DSH Desktop 0.2.2-rc.1**, verified on Windows on 2026-11-07. Reactions use the shared message bubble marker and await the session-projection handle API introduced by the updated host. Existing v1 reaction storage remains in use. Restart DSH after updating to load the Host changes.
 
 ## Preview
 

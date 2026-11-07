@@ -7,13 +7,13 @@ settings.test.mjs: 真实配置适配器的设置回归；覆盖串行保存、�
 picker.test.mjs: 分组目录选择与完整贴纸 ID 插入；覆盖网格复位和目录刷新后的选择回退
 release-notes.test.mjs: 临时 Git 仓库验证标签范围、英文分类、贡献者与发布说明 CLI
 painter.test.mjs: 当前 Desktop 贴纸 DOM 回归；覆盖旧容器拒绝、仅贴纸消息可见、重渲染与素材移除还原
-reaction-painter.test.mjs: 当前 Desktop 回应 DOM 回归；覆盖旧容器拒绝、bubble 替换、清空与雨释放
+reaction-painter.test.mjs: 当前 Desktop 回应 DOM 回归；覆盖共享气泡语义标记、旧容器拒绝、bubble 替换、清空与雨释放
 dom-fixture.mjs: 测试专用 ModuleLoader/React/DOM fixture；支持实际 painter 的标签、类名与属性选择器
 runtime-fixture.mjs: 客户端集成 fixture；模拟 HTTP、计时器、observer 和宿主生命周期
 runtime.test.mjs: 真实 apply 的卸载与重载回归；验证资源释放、订阅与在途请求取消
 feed.test.mjs: 受控网络和计时器回归；覆盖当前快照、旧协议拒绝、退避、重启与取消
 auth.test.mjs: 共享诊断认证协议回归；覆盖 grant 隔离、Cookie 签名、authority 与有效期
-regression.test.mjs: Host 组装、回合目标投影及存储回归；覆盖恢复、目标锁定和投影缺失/卸载，独立临时目录隔离真实配置
+regression.test.mjs: Host 组装、回合目标投影及存储回归；覆盖异步句柄、恢复、目标锁定和投影缺失/卸载，临时目录隔离真实配置
 discovery.test.mjs: 模型素材发现契约；覆盖两级查询、分页边界、刷新、开关及可见输出
 
 [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
